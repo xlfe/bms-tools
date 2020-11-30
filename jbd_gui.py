@@ -1,0 +1,929 @@
+#!/usr/bin/env python
+import os
+import sys
+import wx
+import wx.grid
+import wx.svg
+import wx.lib.scrolledpanel as scrolled
+import time
+import bmstools.jbd as jbd
+import re
+import serial
+import math
+import random
+from pprint import pprint
+
+try:
+    # PyInstaller creates a temp folder and stores path in _MEIPASS
+    base_path = sys._MEIPASS
+except Exception:
+    base_path = os.path.dirname(os.path.abspath(__file__))
+
+rflags = wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT
+lflags = wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT
+defaultBorder = wx.EXPAND | wx.TOP | wx.BOTTOM | wx.LEFT | wx.RIGHT, 7
+colGap = (10,1)
+boxGap = (3,3)
+
+class SVGImage(wx.Panel):
+    def __init__(self, parent, img, name):
+        super().__init__(parent, name = name)
+        self.reqWidth = None
+        self.reqHeight = None
+        self.Bind(wx.EVT_PAINT, self.OnPaint)
+        self.SetImage(img)
+        self.Refresh()
+
+
+    def SetImage(self, img):
+        if isinstance(img, wx.svg.SVGimage):
+            self.img = img
+        else:
+            self.img = wx.svg.SVGimage.CreateFromFile(img)
+        self.Refresh()
+
+    def SetReqSize(self, width, height):
+        self.reqWidth = width
+        self.reqHeight = height
+
+    def OnPaint(self, event):
+        w,h = self.Size
+        if self.reqWidth is not None:
+            w = self.reqWidth
+        if self.reqHeight is not None:
+            h = self.reqHeight
+        self.SetSize(w,h)
+        
+
+        dc = wx.PaintDC(self)
+        dc.SetBackground(wx.Brush(wx.GREEN, wx.TRANSPARENT))
+        #dc.SetBackground(wx.Brush(wx.GREEN))
+        dc.Clear()
+        hscale = self.Size.width / self.img.width
+        vscale = self.Size.height / self.img.height
+        scale = min(hscale, vscale)
+        w,h = [int(i * scale) for i in (self.img.width, self.img.height)]
+
+        bm = self.img.ConvertToScaledBitmap(self.Size)
+        dc2 = wx.MemoryDC(bm)
+        xoff = (dc.Size.width - w)//2
+        yoff = (dc.Size.height - h)//2
+        dc.Blit(xoff,yoff,*dc2.Size,dc2,0,0)
+
+class BoolImage(SVGImage):
+    def __init__(self, parent, img1, img2, name):
+        if isinstance(img1, wx.svg.SVGimage):
+            self.img1 = fn
+        else:
+            self.img1 = wx.svg.SVGimage.CreateFromFile(img1)
+        if isinstance(img2, wx.svg.SVGimage):
+            self.img2 = fn
+        else:
+            self.img2 = wx.svg.SVGimage.CreateFromFile(img2)
+
+        super().__init__(parent, img1, name)
+    
+    def SelectImage(self, which):
+        self.SetImage(self.img1 if bool(which) else self.img2)
+        self.Refresh()
+
+class Layout: 
+    def __init__(self, parent):
+        tc = wx.TextCtrl(parent)
+        self.txtSize30 = tc.GetSizeFromTextSize(parent.GetTextExtent('9' * 30))
+        self.txtSize25 = tc.GetSizeFromTextSize(parent.GetTextExtent('9' * 25))
+        self.txtSize20 = tc.GetSizeFromTextSize(parent.GetTextExtent('9' * 20))
+        self.txtSize10 = tc.GetSizeFromTextSize(parent.GetTextExtent('9' * 10))
+        self.txtSize8  = tc.GetSizeFromTextSize(parent.GetTextExtent('99999999'))
+        self.txtSize6  = tc.GetSizeFromTextSize(parent.GetTextExtent('999999'))
+        self.txtSize4  = tc.GetSizeFromTextSize(parent.GetTextExtent('9999'))
+        self.txtSize3  = tc.GetSizeFromTextSize(parent.GetTextExtent('999'))
+        self.txtSize2  = tc.GetSizeFromTextSize(parent.GetTextExtent('99'))
+        self.txtSize1  = tc.GetSizeFromTextSize(parent.GetTextExtent('9'))
+        tc.Destroy()
+    
+    ####
+    ##### Info tab methods 
+    ####
+
+    def infoTab(self, tab):
+        hsizer = wx.BoxSizer()
+        tab.SetSizer(hsizer)
+        self.cellsInfo(tab, hsizer, colGap, boxGap)
+        self.packInfo(tab, hsizer, colGap, boxGap)
+
+        vsizer = wx.BoxSizer(wx.VERTICAL)
+        hsizer.Add(vsizer, 1, wx.EXPAND)
+        self.deviceInfo(tab, vsizer, colGap, boxGap)
+        self.deviceStatus(tab, vsizer, colGap, boxGap)
+
+        tab.Layout()
+        tab.Fit()
+
+    def cellsInfo(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+        sizer.Add(panel, 0, *defaultBorder)
+
+        sb = wx.StaticBox(panel, label='Cells')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        panel.SetSizer(sbs)
+
+        sp = scrolled.ScrolledPanel(sb)
+
+        sbs.Add(sp, 1, *defaultBorder)
+        bs = wx.BoxSizer(wx.VERTICAL)
+        sp.SetSizer(bs)
+
+        if isinstance(sp, scrolled.ScrolledPanel):
+            sp.SetupScrolling(scroll_x=False)
+
+        rows = 3
+        cols = 4
+        g = wx.grid.Grid(sp, name='cell_grid')
+        g.CreateGrid(rows, cols)
+        g.EnableEditing(False)
+        g.DisableDragColSize()
+        g.DisableDragRowSize()
+        g.SetColLabelSize(self.txtSize4[1])
+
+        g.SetColLabelValue(0, 'Cell')
+        g.SetColLabelValue(1, 'mV')
+        g.SetColLabelValue(2, 'Bal')
+        g.SetColLabelValue(3, 'Temp')
+        g.SetRowLabelSize(1)
+        for i in range(cols):
+            g.SetColSize(i, self.txtSize4[0])
+
+        bs.Add(g, 1, wx.EXPAND)
+
+    def packInfo(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+        sizer.Add(panel, 0, *defaultBorder)
+
+        sb = wx.StaticBox(panel, label='Pack')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        panel.SetSizer(sbs)
+
+        fgs = wx.FlexGridSizer(3, gap = boxGap)
+        sbs.Add(fgs, 0, *defaultBorder)
+
+        def gen(label, fn, unit = ''):
+            t = wx.TextCtrl(sb, name=fn, size=self.txtSize6, style=wx.TE_RIGHT)
+            t.Enable(False)
+            return [
+                (wx.StaticText(sb, label=label + ':'), 0, rflags),
+                (t, 0, lflags),
+                (wx.StaticText(sb, label=unit), 0, lflags),
+            ]
+        fgs.AddMany(gen('Pack V', 'pack_mv', 'mv'))
+        fgs.AddMany(gen('Pack I', 'pack_ma', 'mA'))
+        fgs.AddMany(gen('Avg V', 'cell_avg_mv', 'mv'))
+        fgs.AddMany(gen('Max V', 'cell_max_mv', 'mv'))
+        fgs.AddMany(gen('Min V', 'cell_min_mv', 'mv'))
+        fgs.AddMany(gen('Δ V', 'cell_delta_mv', 'mv'))
+        fgs.AddMany(gen('Cycles', 'cycle_cnt'))
+        fgs.AddMany(gen('Capacity', 'cap_nom', 'mAh'))
+        fgs.AddMany(gen('Cap Rem', 'cap_rem', 'mAh'))
+        sbs.Add(Gauge(sb, name='cap_pct'), 1, wx.EXPAND)
+        bs = wx.BoxSizer()
+        sbs.Add(bs, 1, wx.EXPAND)
+        bs.AddStretchSpacer()
+        bs.Add(wx.StaticText(sb, label='Remaining Capacity'), 0,  wx.TOP)
+        bs.AddStretchSpacer()
+
+    def deviceInfo(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+        sizer.Add(panel, 1, *defaultBorder)
+
+        sb = wx.StaticBox(panel, label='Device')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        panel.SetSizer(sbs)
+
+        fgs = wx.FlexGridSizer(2, gap = boxGap)
+        sbs.Add(fgs, 0, *defaultBorder)
+
+        # device name
+        fgs.Add(wx.StaticText(sb, label='Name:'), 0, rflags)
+        t = wx.TextCtrl(sb, name='device_name', size=self.txtSize30)
+        t.Enable(False)
+        fgs.Add(t, 0, lflags)
+
+        # mfg date
+        fgs.Add(wx.StaticText(sb, label='Mfg Date:'), 0, rflags)
+        t = wx.TextCtrl(sb, name='mfg_date', size=self.txtSize8)
+        t.Enable(False)
+        fgs.Add(t, 0, lflags)
+
+        # version
+        fgs.Add(wx.StaticText(sb, label='Version:'), 0, rflags)
+        t = wx.TextCtrl(sb, name='version', size=self.txtSize4)
+        t.Enable(False)
+        fgs.Add(t, 0, lflags)
+
+    def deviceStatus(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+        sizer.Add(panel, 3, *defaultBorder)
+
+        sb = wx.StaticBox(panel, label='Status')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        panel.SetSizer(sbs)
+
+        cf_en_svg = os.path.join(base_path, 'img', 'chg_fet_enabled.svg')
+        cf_dis_svg = os.path.join(base_path, 'img', 'chg_fet_disabled.svg')
+        df_en_svg = os.path.join(base_path, 'img', 'dsg_fet_enabled.svg')
+        df_dis_svg = os.path.join(base_path, 'img', 'dsg_fet_disabled.svg')
+
+        chg_fet_img = BoolImage(sb, cf_en_svg, cf_dis_svg, 'chg_fet_status_img')
+        dsg_fet_img = BoolImage(sb, df_en_svg, df_dis_svg, 'dsg_fet_status_img')
+
+        bsh = wx.BoxSizer()
+        sbs.Add(bsh, 1, wx.EXPAND)
+
+        bsv1 = wx.BoxSizer(wx.VERTICAL)
+        bsv2 = wx.BoxSizer(wx.VERTICAL)
+        bsh.Add(bsv1, 8, wx.EXPAND | wx.ALL, 3)
+        bsh.AddStretchSpacer(2)
+        bsh.Add(bsv2, 8, wx.EXPAND | wx.ALL, 3)
+
+        bsg = wx.BoxSizer()
+        bsg.AddStretchSpacer(1)
+        bsg.Add(chg_fet_img, 5,  wx.EXPAND)
+        bsg.AddStretchSpacer(1)
+        bsv1.Add(bsg, 1, wx.EXPAND)
+        bst = wx.BoxSizer()
+        bsv1.Add(bst, 1, wx.ALIGN_CENTER_HORIZONTAL)
+        bst.Add(wx.StaticText(sb, label='Charge FET:'), 0)
+        bst.Add(wx.StaticText(sb, label='ENABLED', name='chg_fet_status_txt'), 0)
+
+        bsg = wx.BoxSizer()
+        bsg.AddStretchSpacer(1)
+        bsg.Add(dsg_fet_img, 5,  wx.EXPAND)
+        bsg.AddStretchSpacer(1)
+        bsv2.Add(bsg, 1, wx.EXPAND)
+        bst = wx.BoxSizer()
+        bsv2.Add(bst, 1, wx.ALIGN_CENTER_HORIZONTAL)
+        bst.Add(wx.StaticText(sb, label='Discharge FET:'), 0)
+        bst.Add(wx.StaticText(sb, label='ENABLED', name='dsg_fet_status_txt'), 0)
+
+
+        ok_svg = os.path.join(base_path, 'img', 'ok.svg')
+        err_svg = os.path.join(base_path, 'img', 'err.svg')
+
+        # error flags
+        gbs = wx.GridBagSizer(3,3)
+        sbs.Add(gbs, 1, *defaultBorder)
+
+        class Gen:
+            size = (self.txtSize8[1], self.txtSize8[1])
+            def __init__(self, l):
+                self.row = 0
+                self.col = 0
+                self.cols = 11
+                self.l = l
+
+            def incLine(self):
+                self.row += 1
+                self.col = 0
+
+            def __call__(self, label, img1, img2, fn):
+                bi = BoolImage(sb, img1, img2, fn)
+                bi.SetMinSize(self.size)
+                bi.SelectImage(False)
+                txt = wx.StaticText(sb, label = label + ':')
+                gbs.Add(txt, (self.row, self.col), flag = rflags)
+                self.col += 1
+                gbs.Add(bi, (self.row, self.col), flag = rflags)
+                self.col += 1
+
+                if self.col == self.cols:
+                    self.incLine()
+                else:
+                    gbs.Add(*self.l.txtSize2,(self.row, self.col))
+                    self.col += 1
+
+        gen = Gen(self)
+
+        gen('COVP', err_svg, ok_svg, 'covp_err')
+        gen('CUVP', err_svg, ok_svg, 'cuvp_err')
+        gen('POVP', err_svg, ok_svg, 'povp_err')
+        gen('PUVP', err_svg, ok_svg, 'puvp_err')
+        gen('CHGOT', err_svg, ok_svg, 'chgot_err')
+        gen('CHGUT', err_svg, ok_svg, 'chgut_err')
+        gen('DSGOT', err_svg, ok_svg, 'dsgot_err')
+        gen('DSGUT', err_svg, ok_svg, 'dsgut_err')
+        gen('CHGOC', err_svg, ok_svg, 'chgoc_err')
+        gen('DSGOC', err_svg, ok_svg, 'dsgoc_err')
+        gen.incLine()
+        gen('Short', err_svg, ok_svg, 'sc_err')
+        gen.incLine()
+        gen('AFE', err_svg, ok_svg, 'afe_err')
+        gen.incLine()
+        gen('SW Lock', err_svg, ok_svg, 'afe_err')
+
+
+
+
+    ####
+    ##### Settings tab methods 
+    ####
+
+    def settingsTab(self, tab):
+        boxSizer  = wx.BoxSizer(wx.HORIZONTAL)
+        tab.SetSizer(boxSizer)
+        col1Sizer = wx.BoxSizer(wx.VERTICAL)
+        col2Sizer = wx.FlexGridSizer(1)
+        col3Sizer = wx.FlexGridSizer(1)
+        boxSizer.AddMany([col1Sizer, col2Sizer, col3Sizer])
+
+        self.basicConfig(tab, col1Sizer, colGap, boxGap)
+        self.highProtectConfig(tab, col1Sizer, colGap, boxGap)
+        self.functionConfig(tab, col2Sizer, colGap, boxGap)
+        self.ntcConfig(tab, col2Sizer, colGap, boxGap)
+        self.balanceConfig(tab, col2Sizer, colGap, boxGap)
+        self.otherConfig(tab, col2Sizer, colGap, boxGap)
+        self.capacityConfig(tab, col3Sizer, colGap, boxGap)
+        self.faultCounts(tab, col3Sizer, colGap, boxGap)
+
+        tab.Layout()
+        tab.Fit()
+
+    def basicConfig(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+
+        sb = wx.StaticBox(panel, label='Basic Configuration')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        fgs = wx.FlexGridSizer(11, gap=boxGap)
+        sbs.Add(fgs, 0, *defaultBorder)
+        panel.SetSizer(sbs)
+        sizer.Add(panel, 0, *defaultBorder)
+
+        def gen(fn, unit1, unit2 = None, unit3 = 'S', spacing=10):
+            unit2 = unit2 or unit1
+            items = [
+                (wx.StaticText(sb, label = fn.upper()), 0, rflags),
+                (wx.TextCtrl(sb, name = fn, size = self.txtSize6), 0, lflags),
+                (wx.StaticText(sb, label = unit1), 0, lflags),
+                colGap,
+                (wx.StaticText(sb, label = 'Rel'), 0, rflags),
+                (wx.TextCtrl(sb, name = fn + '_rel', size=self.txtSize6), 0, lflags),
+                (wx.StaticText(sb, label = unit2), 0, lflags),
+                colGap,
+                (wx.StaticText(sb, label = 'Delay'), 0, rflags),
+                (wx.TextCtrl(sb, name = fn + '_delay', size=self.txtSize3), 0, lflags),
+                (wx.StaticText(sb, label = unit3), 0, lflags),
+            ]
+            return items
+
+        fgs.AddMany(gen('covp', 'mV'))
+        fgs.AddMany(gen('cuvp', 'mV'))
+        fgs.AddMany(gen('povp', 'mV'))
+        fgs.AddMany(gen('puvp', 'mV'))
+        fgs.AddMany(gen('chgot', 'C'))
+        fgs.AddMany(gen('chgut', 'C'))
+        fgs.AddMany(gen('dsgot', 'C'))
+        fgs.AddMany(gen('dsgut', 'C'))
+        fgs.AddMany(gen('chgoc', 'mA', 'S'))
+        fgs.AddMany(gen('dsgoc', 'mA', 'S'))
+
+        fgs.Fit(panel)
+
+    def highProtectConfig(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+        sb = wx.StaticBox(panel, label='High Protection Configuration')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        fgs = wx.FlexGridSizer(5, gap=boxGap)
+        panel.SetSizer(sbs)
+        sizer.Add(panel, 1, *defaultBorder)
+        
+        fgs.AddGrowableCol(2)
+        a = wx.ALIGN_CENTER_VERTICAL
+        sbs.Add(wx.CheckBox(sb, label='2X OC and SC values', name = 'sc_dsgoc_x2'))
+        sbs.Add(fgs, 0, *defaultBorder)
+        # DSGOC2
+        s1 = wx.BoxSizer()
+        s2 = wx.BoxSizer()
+        spacer = wx.BoxSizer()
+        spacer.AddStretchSpacer()
+
+        s1.AddMany([
+            (wx.ComboBox(sb, choices = [str(i) for i in jbd.Dsgoc2Enum], name='dsgoc2'), 0, a),
+            (wx.StaticText(sb, label = 'mV'), 0, a),
+        ])
+        s2.AddMany([ 
+                (wx.ComboBox(sb, choices = [str(i) for i in jbd.Dsgoc2DelayEnum], name='dsgoc2_delay'), 0, a),
+                (wx.StaticText(sb, label = 'mS'), 0, a),
+        ])
+        
+
+        fgs.AddMany([
+            (wx.StaticText(sb, label = 'DSGOC2'), 0, a), (s1,), 
+            (spacer,),
+            (wx.StaticText(sb, label = 'Delay'), 0, a), (s2,)
+            ])
+
+        # SC value / delay
+        s1 = wx.BoxSizer()
+        s2 = wx.BoxSizer()
+        spacer = wx.BoxSizer()
+        spacer.AddStretchSpacer()
+        s1.AddMany([     
+                (wx.ComboBox(sb, choices = [str(i) for i in jbd.ScEnum], name = 'sc'), 0, a),
+                (wx.StaticText(sb, label = 'mV'), 0, a)
+        ])
+        s2.AddMany([ 
+                (wx.ComboBox(sb, choices = [str(i) for i in jbd.ScDelayEnum], name = 'sc_delay'), 0, a),
+                (wx.StaticText(sb, label = 'uS'), 0, a)
+        ])
+
+        fgs.AddMany([
+            (wx.StaticText(sb, label = 'SC Value'), 0, a), (s1,), 
+            (spacer,),
+            (wx.StaticText(sb, label = 'Delay'), 0, a), (s2,)
+            ])
+
+        # COVP High
+        s1 = wx.BoxSizer()
+        s2 = wx.BoxSizer()
+        spacer = wx.BoxSizer()
+        spacer.AddStretchSpacer()
+        s1.AddMany([
+                (wx.TextCtrl(sb, name = 'covp_high'), 0, a),
+                (wx.StaticText(sb, label = 'mV'), 0, a),
+        ])
+        s2.AddMany([
+                (wx.ComboBox(sb, choices = [str(i) for i in jbd.CovpHighDelayEnum], name = 'covp_high_delay'), 0, a),
+                (wx.StaticText(sb, label = 'S'), 0, a),
+        ])
+
+        fgs.AddMany([
+            (wx.StaticText(sb, label = 'COVP High'), 0, a), (s1,), 
+            (spacer,),
+            (wx.StaticText(sb, label = 'Delay'), 0, a), (s2,)
+            ])
+
+        # CUVP High
+        s1 = wx.BoxSizer()
+        s2 = wx.BoxSizer()
+        spacer = wx.BoxSizer()
+        spacer.AddStretchSpacer()
+        s1.AddMany([
+                (wx.TextCtrl(sb, name = 'cuvp_high'), 0, a),
+                (wx.StaticText(sb, label = 'mV'), 0, a),
+        ])
+        s2.AddMany([
+                (wx.ComboBox(sb, choices = [str(i) for i in jbd.CuvpHighDelayEnum], name = 'covp_high_delay'), 0, a),
+                (wx.StaticText(sb, label = 'S'), 0, a),
+        ])
+        fgs.AddMany([
+            (wx.StaticText(sb, label = 'CUVP High'), 0, a), (s1,), 
+            (spacer,),
+            (wx.StaticText(sb, label = 'Delay'), 0, a), (s2,)
+            ])
+
+        # SC Release
+        s1 = wx.BoxSizer()
+        s1.AddMany([
+                (wx.ComboBox(sb, choices = [str(i) for i in range(256)], name = 'sc_rel'), 0, lflags),
+                (wx.StaticText(sb, label = 'S'), 0, lflags),
+        ])
+        fgs.AddMany([
+            (wx.StaticText(sb, label = 'SC Rel'), 0, a), (s1,), 
+            ])
+
+    def functionConfig(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+        sb = wx.StaticBox(panel, label='Function Configuration')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        fgs = wx.FlexGridSizer(3, gap=boxGap)
+        sbs.Add(fgs, 0, *defaultBorder)
+        panel.SetSizer(sbs)
+        sizer.Add(panel, 1, *defaultBorder)
+
+        fgs.AddMany([
+            (wx.CheckBox(sb, name='switch', label='Switch'),),
+            (wx.CheckBox(sb, name='scrl', label='SC Rel'),),
+            (wx.CheckBox(sb, name='balance_en', label='Bal En'),),
+            (wx.CheckBox(sb, name='led_en', label='LED En'),),
+            (wx.CheckBox(sb, name='led_num', label='LED Num'),),
+            (wx.CheckBox(sb, name='chg_balance_en', label='Chg Bal En'),),
+        ])
+
+    def ntcConfig(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+        sb = wx.StaticBox(panel, label='Function Configuration')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        fgs = wx.FlexGridSizer(4, gap=boxGap)
+        sbs.Add(fgs, 0, *defaultBorder)
+        panel.SetSizer(sbs)
+        sizer.Add(panel, 1, *defaultBorder)
+
+        fgs.AddMany([
+            (wx.CheckBox(sb, name=f'ntc{i}', label=f'NTC{i}'),) for i in range(1,9)
+        ])
+
+    def balanceConfig(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+        sb = wx.StaticBox(panel, label='Balance Configuration')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        fgs = wx.FlexGridSizer(3, gap=boxGap)
+        sbs.Add(fgs, 0, *defaultBorder)
+        panel.SetSizer(sbs)
+        sizer.Add(panel, 1, *defaultBorder)
+
+        fgs.AddMany([
+            (wx.StaticText(sb, label='Start Voltage'), 0, rflags),
+            (wx.TextCtrl(sb, name='bal_start'), 0, lflags),
+            (wx.StaticText(sb, label='mV'), 0, lflags),
+
+            (wx.StaticText(sb, label='Balance Window'), 0, rflags),
+            (wx.TextCtrl(sb, name='bal_window'), 0, lflags),
+            (wx.StaticText(sb, label='mV'), 0, lflags),
+        ])
+
+    def otherConfig(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+        sb = wx.StaticBox(panel, label='Other Configuration')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        fgs = wx.FlexGridSizer(5, gap=boxGap)
+        fgs.AddGrowableCol(2)
+        a = wx.ALIGN_CENTER_VERTICAL
+        sbs.Add(fgs, 0, *defaultBorder)
+        panel.SetSizer(sbs)
+        sizer.Add(panel, 1, *defaultBorder)
+
+        s1 = wx.BoxSizer()
+        s2 = wx.BoxSizer()
+
+        s1.AddMany([
+            (wx.TextCtrl(sb, name='shunt_res', size=self.txtSize6), 0, a),
+            (wx.StaticText(sb, label = 'mΩ'), 0, a),
+        ])
+        s2.AddMany([ 
+                (wx.ComboBox(sb, choices = [str(i) for i in range(1,17)], name='cell_cnt'), 0, a),
+        ])
+        spacer = wx.BoxSizer()
+        spacer.AddStretchSpacer()
+        fgs.AddMany([
+            (wx.StaticText(sb, label = 'Shunt res'), 0, a), (s1,), 
+            (spacer,),
+            (wx.StaticText(sb, label = 'Cell cnt'), 0, a), (s2,)
+            ])
+
+        s1 = wx.BoxSizer()
+        s2 = wx.BoxSizer()
+
+        s1.AddMany([
+            (wx.TextCtrl(sb, name='cycle_cnt', size=self.txtSize4), 0, a),
+        ])
+        s2.AddMany([ 
+            (wx.TextCtrl(sb, name='serial_num', size=self.txtSize6), 0, a),
+        ])
+        spacer = wx.BoxSizer()
+        spacer.AddStretchSpacer()
+        fgs.AddMany([
+            (wx.StaticText(sb, label = 'Cycle cnt'), 0, a), (s1,), 
+            (spacer,),
+            (wx.StaticText(sb, label = 'Serial num'), 0, a), (s2,)
+            ])
+
+
+        fgs = wx.FlexGridSizer(2, gap=boxGap)
+        sbs.Add(fgs, 0, *defaultBorder)
+
+        d = wx.BoxSizer()
+        d.AddMany([
+            (wx.TextCtrl(sb, name='year', size=self.txtSize4), 0, a),
+            (wx.StaticText(sb,label='-'), 0, a),
+            (wx.TextCtrl(sb, name='month', size=self.txtSize2), 0, a),
+            (wx.StaticText(sb,label='-'), 0, a),
+            (wx.TextCtrl(sb, name='day', size=self.txtSize2), 0, a),
+        ])
+
+        fgs.AddMany([
+            (wx.StaticText(sb, label='Mfg Name'), 0, a),
+            (wx.TextCtrl(sb, name='mfg_name', size=self.txtSize20), 0, a),
+
+            (wx.StaticText(sb, label='Device Name'), 0, a),
+            (wx.TextCtrl(sb, name='device_name', size=self.txtSize20), 0, a),
+
+            (wx.StaticText(sb, label='Mfg Date'), 0, a),
+            d,
+
+            (wx.StaticText(sb, label='Barcode'), 0, a),
+            (wx.TextCtrl(sb, name='barcode', size=self.txtSize20), 0, a),
+        ])
+
+    def capacityConfig(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+        sb = wx.StaticBox(panel, label='Capacity Configuration')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        fgs = wx.FlexGridSizer(3, gap=boxGap)
+        fgs.AddGrowableCol(2)
+        a = wx.ALIGN_CENTER_VERTICAL
+        sbs.Add(fgs, 0, *defaultBorder)
+        panel.SetSizer(sbs)
+        sizer.Add(panel, 1, *defaultBorder)
+
+        def gen(label, fn, unit):
+            items = [
+                (wx.StaticText(sb, label = label), 0, rflags),
+                (wx.TextCtrl(sb, name = fn, size = self.txtSize6), 0, lflags),
+                (wx.StaticText(sb, label = unit), 0, lflags),
+            ]
+            return items
+
+        fgs.AddMany(gen('Design Cap', 'design_cap', 'mAh'))
+        fgs.AddMany(gen('Cycle Cap', 'cycle_cap', 'mAh'))
+        fgs.AddMany(gen('Cell 100%', 'cap_100', 'mV'))
+        fgs.AddMany(gen('Cell 80%', 'cap_80', 'mV'))
+        fgs.AddMany(gen('Cell 60%', 'cap_60', 'mV'))
+        fgs.AddMany(gen('Cell 40%', 'cap_40', 'mV'))
+        fgs.AddMany(gen('Cell 20%', 'cap_20', 'mV'))
+        fgs.AddMany(gen('Cell 0%', 'cap_0', 'mV'))
+        fgs.AddMany(gen('Dsg Rate', 'dsg_rate', '%'))
+        fgs.AddMany(gen('FET ctrl', 'fet_ctrl', 'S'))
+        fgs.AddMany(gen('LED timer', 'led_timer', 'S'))
+
+    def faultCounts(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+        sb = wx.StaticBox(panel, label='Fault Counts')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        fgs = wx.FlexGridSizer(4, gap=boxGap)
+        fgs.AddGrowableCol(2)
+        a = wx.ALIGN_CENTER_VERTICAL
+        sbs.Add(fgs, 0, *defaultBorder)
+        panel.SetSizer(sbs)
+        sizer.Add(panel, 1, *defaultBorder)
+
+        def gen(label1, field1, label2 = None, field2 = None):
+            items = [
+                (wx.StaticText(sb, label = label1+':'), 0, rflags),
+                (wx.StaticText(sb, name = field1, label='0'), 0, lflags)
+            ]
+            if field2:
+                items += [
+                (wx.StaticText(sb, label = label2+':'), 0, rflags),
+                (wx.StaticText(sb, name = field2, label='0'), 0, lflags),
+            ]
+            return items
+
+        fgs.AddMany(gen('CHGOC', 'chgoc_err', 'DSGOC', 'dsgoc_err'))
+        fgs.AddMany(gen('CHGOT', 'chgot_err', 'CHGUT', 'chgut_err'))
+        fgs.AddMany(gen('DSGOT', 'dsgot_err', 'DSGUT', 'dsgut_err'))
+        fgs.AddMany(gen('POVP',  'povp_err',  'PUVP',  'puvp_err'))
+        fgs.AddMany(gen('COVP',  'covp_err',  'CUVP',  'cuvp_err'))
+        fgs.AddMany(gen('SC',    'sc_err'))
+
+class Gauge(wx.Panel):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.onTimer)
+        self.width = 15
+        self.value = 0
+        self.SetRange(0, 100)
+        self.SetArc(135, 405)
+        self.Bind(wx.EVT_PAINT, self.OnPaint)
+        self.SetDoubleBuffered(True)
+        self.font = wx.Font(kwargs.get('font_size', 10), wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+
+        self.bgColor = '#707070'
+        self.fgColor = '#20d020'
+        self.valueSuffix = '%'
+        self.SetTransparent(0)
+
+    def onTimer(self, event):
+        # smooooooooove
+        cutoff = (self.max - self.min) / 500
+        delta = self.targetValue - self.value
+        step = math.copysign(max(cutoff, abs(delta) *.08), delta)
+        if abs(delta) < cutoff:
+            self.value = self.targetValue
+            self.timer.Stop()
+        else:
+            self.value += math.copysign(step, delta)
+        self.Refresh()
+        
+
+    def SetArc(self, start, end):
+        self.arcStart = start
+        self.arcEnd = end
+
+    def SetRange(self, min, max):
+        self.min = min
+        self.max = max
+        self.SetValue(self.value) # for range checking
+        self.Refresh()
+
+    def SetValue(self, val):
+        val = int(val)
+        self.targetValue = val
+        self.targetValue = max(self.min, self.targetValue)
+        self.targetValue = min(self.max, self.targetValue)
+        self.timer.Start(5)
+        self.Refresh()
+
+    def SetWidth(self):
+        self.width = width
+
+    def OnPaint(self, event=None):
+        dc = wx.PaintDC(self)
+        dc.SetBackground(wx.Brush(wx.WHITE, wx.TRANSPARENT))
+        dc.Clear()
+        gc = wx.GraphicsContext.Create(dc)
+        self.Draw(gc)
+
+    def Draw(self, gc):
+        size = gc.GetSize()
+
+        center = [i//2 for i in size]
+        radius = min(size)//2 - self.width//1.8
+
+        # background
+        radStart = math.radians(self.arcStart)
+        radEnd = math.radians(self.arcEnd)
+        path = gc.CreatePath()
+        path.AddArc(*center, radius, radStart, radEnd, True)
+        pen = wx.Pen(self.bgColor, self.width)
+        pen.SetCap(wx.CAP_BUTT)
+        gc.SetPen(pen)
+        gc.SetBrush(wx.Brush('#000000', wx.TRANSPARENT))
+        gc.DrawPath(path)
+
+        #progress bar
+        pct = self.value / (self.max - self.min)
+        end = (self.arcEnd - self.arcStart) * pct + self.arcStart
+        start = math.radians(self.arcStart)
+        end = math.radians(end)
+        path = gc.CreatePath()
+        path.AddArc(*center, radius, start, end, True)
+        pen = wx.Pen(self.fgColor, self.width)
+        pen.SetCap(wx.CAP_BUTT)
+        gc.SetPen(pen)
+        gc.SetBrush(wx.Brush('#000000', wx.TRANSPARENT))
+        gc.DrawPath(path)
+
+        #text
+
+        gc.SetFont(self.font, '#000000')
+        s = str(int(self.value)) + self.valueSuffix
+        w,h = self.GetTextExtent(s)
+        x,y = center[0] - w // 2, center[1] - h // 2
+
+        gc.DrawText(s, x,y)
+
+
+class Main(wx.Frame):
+    ntc_RE = re.compile(r'ntc\d+')
+    def __init__(self, *args, **kwargs):
+        kwargs['style'] = wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX)
+        wx.Frame.__init__(self, *args, **kwargs)
+
+        self.j = jbd.JBD(serial.Serial('COM4'))
+
+        font = wx.Font(9, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
+        self.SetFont(font)
+
+        layout = Layout(self)
+
+
+        # tabs layout
+        nb_panel = wx.Panel(self)
+
+        nb = wx.Notebook(nb_panel)
+        tab1 = wx.Panel(nb)
+        tab2 = wx.Panel(nb)
+
+        layout.infoTab(tab1)
+        layout.settingsTab(tab2)
+
+        nb.AddPage(tab1, 'Info')
+        nb.AddPage(tab2, 'Settings')
+
+        nb_sizer = wx.BoxSizer()
+        nb_sizer.Add(nb, 1, wx.EXPAND)
+        nb_panel.SetSizer(nb_sizer)
+
+        # self layout
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(nb_panel, 1, wx.EXPAND)
+        self.SetSizer(sizer)
+
+        readButton = wx.Button(self, label='Read')
+        readButton.Bind(wx.EVT_BUTTON, self.readInfo)
+        bot_sizer = wx.BoxSizer()
+        bot_sizer.Add(wx.StaticText(self, name='status_txt'), 0, wx.TEXT_ALIGNMENT_LEFT)
+        bot_sizer.AddStretchSpacer(1)
+        bot_sizer.Add(readButton, 0, wx.TEXT_ALIGNMENT_CENTER)
+        bot_sizer.AddStretchSpacer(1)
+        bot_sizer.Add(wx.StaticText(self, name='serial_txt'), 0, wx.TEXT_ALIGNMENT_CENTER)
+        bot_sizer.AddStretchSpacer(1)
+        bot_sizer.Add(wx.StaticText(self, name='date_time_txt'), 0, wx.TEXT_ALIGNMENT_RIGHT)
+        sizer.Add(bot_sizer, 0, wx.EXPAND | wx.ALL, 5)
+
+        # ---
+
+        def sizeFix(event):
+            # https://trac.wxwidgets.org/ticket/16088#comment:4
+            win = event.GetEventObject()
+            win.GetSizer().SetSizeHints(self)
+            win.Bind(wx.EVT_SHOW, None)
+
+        self.Bind(wx.EVT_SHOW, sizeFix)
+
+        self.setupClockTimer()
+
+    def setupClockTimer(self):
+        self.clockTimer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self.onTimer)
+        self.clockTimer.Start(1000)
+
+    def onTimer(self, event):
+        t = self.FindWindowByName('date_time_txt')
+        t.SetLabel(time.asctime())
+        self.Layout()
+
+    def set(self, name, value):
+        svalue = str(value)
+        w = self.FindWindowByName(name)
+        if isinstance(w, wx.TextCtrl) or isinstance(w, Gauge):
+            w.SetValue(svalue)
+        elif isinstance(w, wx.StaticText):
+            w.SetLabel(svalue)
+        elif isinstance(w, BoolImage):
+            w.SelectImage(value)
+
+
+    def readInfo(self, event):
+        basicInfo = self.j.readBasicInfo()
+        cellInfo = self.j.readCellInfo()
+        deviceInfo = self.j.readDeviceInfo()
+        temps = [v for k,v in basicInfo.items() if self.ntc_RE.match(k) and v is not None]
+        bals  = [v for k,v in basicInfo.items() if k.startswith('bal') and v is not None]
+        volts = [v for v in cellInfo.values() if v is not None]
+        
+        # Populate cell grid
+        grid = self.FindWindowByName('cell_grid')
+        gridRowsNeeded = max(len(volts), len(temps))
+        gridRowsCurrent = grid.GetNumberRows()
+        if gridRowsNeeded != gridRowsCurrent:
+            grid.DeleteRows(numRows = gridRowsCurrent)
+            grid.InsertRows(numRows = gridRowsNeeded)
+
+        for i in range(gridRowsNeeded):
+            grid.SetCellValue(i, 0, str(i))
+            grid.SetCellValue(i, 1, str(volts[i]) if i < len(volts) else '')
+            grid.SetCellValue(i, 2, 'BAL' if i < len(bals) and bals[i] else '--')
+            grid.SetCellValue(i, 3, str(temps[i]) if i < len(temps) else '')
+
+
+        cell_max_mv = max(volts)
+        cell_min_mv = min(volts)
+        cell_delta_mv = cell_max_mv - cell_min_mv
+        self.set('pack_mv', basicInfo['pack_mv'])
+        self.set('pack_ma', basicInfo['pack_ma'])
+        self.set('cell_avg_mv', sum(volts) // len(volts))
+        self.set('cell_max_mv', cell_max_mv)
+        self.set('cell_min_mv', cell_min_mv)
+        self.set('cell_delta_mv', cell_delta_mv)
+        self.set('cycle_cnt', basicInfo['cycle_cnt'])
+        self.set('cap_nom', basicInfo['cap_nom'])
+        self.set('cap_rem', basicInfo['cap_rem'])
+        self.set('cap_pct', basicInfo['cap_pct'])
+
+        self.set('device_name', deviceInfo['device_name'])
+        date = f"{basicInfo['year']}-{basicInfo['month']}-{basicInfo['day']}"
+        self.set('mfg_date', date)
+        self.set('version', f"0x{basicInfo['version']:02X}")
+
+        pprint(basicInfo)
+
+        cfe = basicInfo['chg_fet_en']
+        dfe = basicInfo['dsg_fet_en']
+        self.set('chg_fet_status_txt', 'ENABLED' if cfe else 'DISABLED')
+        self.set('dsg_fet_status_txt', 'ENABLED' if dfe else 'DISABLED')
+        self.set('chg_fet_status_img', cfe)
+        self.set('dsg_fet_status_img', dfe)
+
+        err_fn = [i for i in basicInfo.keys() if i.endswith('_err')]
+        for f in err_fn:
+            self.set(f,basicInfo[f])
+
+
+appName = 'BMS Tools'
+appVersion = '0.0.1-alpha'
+releaseDate = 'N/A'
+
+    
+class MyApp(wx.App):
+    def OnInit(self):
+        frame = Main(None, title = f'{appName} {appVersion}' )
+        frame.SetIcon(wx.Icon(os.path.join(base_path, 'img', 'batt_icon_128.ico')))
+        frame.Show()
+        return True
+
+if __name__ == "__main__":
+    app = MyApp()
+    app.MainLoop()
