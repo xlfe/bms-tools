@@ -691,6 +691,7 @@ class Layout:
         fgs.AddMany(gen('POVP',  'povp_err_cnt',  'PUVP',  'puvp_err_cnt'))
         fgs.AddMany(gen('COVP',  'covp_err_cnt',  'CUVP',  'cuvp_err_cnt'))
         fgs.AddMany(gen('SC',    'sc_err_cnt'))
+        fgs.Add(wx.Button(sb, label='Clear (fixme)', name='clear_faults_btn'))
 
 class RoundGauge(wx.Panel):
 
