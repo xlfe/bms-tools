@@ -3,6 +3,7 @@
 import serial
 import time
 import struct
+import threading
 import sys
 from enum import Enum
 from functools import partial
@@ -789,6 +790,7 @@ class JBD:
         except: 
             pass
         self._open_cnt = 0
+        self._lock = threading.RLock()
         self.timeout = timeout
         self.debug = debug
 
@@ -811,6 +813,7 @@ class JBD:
 
     def open(self):
         if not self._open_cnt:
+            self._lock.acquire()
             self.s.open()
         self._open_cnt += 1
     
@@ -820,6 +823,7 @@ class JBD:
         self._open_cnt -= 1
         if not self._open_cnt:
             self.s.close()
+            self._lock.release()
 
     @staticmethod
     def chksum(payload):
@@ -904,7 +908,7 @@ class JBD:
                 self.s.write(cmd)
                 payload = self.readPacket()
                 if payload is None: raise TimeoutError()
-                if progressFunc: progressFunc(i // numRegs * 100)
+                if progressFunc: progressFunc(int(i / (numRegs-1) * 100))
                 reg.unpack(payload)
                 ret.update(dict(reg))
             self.exitFactory()
