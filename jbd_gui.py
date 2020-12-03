@@ -5,6 +5,7 @@ import time
 import re
 import serial
 import math
+import enum
 import random
 import threading
 import traceback
@@ -32,6 +33,39 @@ lflags = wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_LEFT
 defaultBorder = wx.EXPAND | wx.TOP | wx.BOTTOM | wx.LEFT | wx.RIGHT, 7
 colGap = (10,1)
 boxGap = (3,3)
+
+class BetterChoice(wx.Choice):
+    def __init__(self, parent, **kwargs):
+        choices = kwargs.get('choices')
+        kwargs['choices'] = [str(i) for i in choices]
+        super().__init__(parent, **kwargs)
+        self.SetSelection(0)
+
+    def GetValue(self):
+        idx = self.GetSelection()
+        if idx == wx.NOT_FOUND:
+            return None
+        return self.GetString(idx)
+
+    def SetValue(self, value):
+        idx = self.FindString(str(value))
+        if idx == wx.NOT_FOUND: 
+            print(f'{self.__class__.__name__}: {self.Name} to unknown choice {value}')
+            return
+        self.SetSelection(idx)
+
+class EnumChoice(BetterChoice):
+    def __init__(self, parent, **kwargs):
+        choices = kwargs.get('choices')
+        assert issubclass(choices, jbd.LabelEnum)
+        self.__enum_cls = choices
+        super().__init__(parent, **kwargs)
+        self.SetSelection(0)
+    
+    def GetValue(self):
+        idx = self.GetSelection()
+        s = self.GetString(idx)
+        return self.__enum_cls.byDisplay(int(s))
 
 class SVGImage(wx.Panel):
     def __init__(self, parent, img, name):
@@ -407,11 +441,11 @@ class Layout:
         s2 = wx.BoxSizer()
 
         s1.AddMany([
-            (wx.Choice(sb, choices = [str(i) for i in jbd.Dsgoc2Enum], name='dsgoc2'), 0, a),
+            (EnumChoice(sb, choices = jbd.Dsgoc2Enum, name='dsgoc2'), 0, a),
             (wx.StaticText(sb, label = 'mV'), 0, a),
         ])
         s2.AddMany([ 
-                (wx.Choice(sb, choices = [str(i) for i in jbd.Dsgoc2DelayEnum], name='dsgoc2_delay'), 0, a),
+                (EnumChoice(sb, choices = jbd.Dsgoc2DelayEnum, name='dsgoc2_delay'), 0, a),
                 (wx.StaticText(sb, label = 'mS'), 0, a),
         ])
         
@@ -426,11 +460,11 @@ class Layout:
         s1 = wx.BoxSizer()
         s2 = wx.BoxSizer()
         s1.AddMany([     
-                (wx.Choice(sb, choices = [str(i) for i in jbd.ScEnum], name = 'sc'), 0, a),
+                (EnumChoice(sb, choices = jbd.ScEnum, name = 'sc'), 0, a),
                 (wx.StaticText(sb, label = 'mV'), 0, a)
         ])
         s2.AddMany([ 
-                (wx.Choice(sb, choices = [str(i) for i in jbd.ScDelayEnum], name = 'sc_delay'), 0, a),
+                (EnumChoice(sb, choices = jbd.ScDelayEnum, name = 'sc_delay'), 0, a),
                 (wx.StaticText(sb, label = 'uS'), 0, a)
         ])
 
@@ -448,7 +482,7 @@ class Layout:
                 (wx.StaticText(sb, label = 'mV'), 0, a),
         ])
         s2.AddMany([
-                (wx.Choice(sb, choices = [str(i) for i in jbd.CovpHighDelayEnum], name = 'covp_high_delay'), 0, a),
+                (EnumChoice(sb, choices = jbd.CovpHighDelayEnum, name = 'covp_high_delay'), 0, a),
                 (wx.StaticText(sb, label = 'S'), 0, a),
         ])
 
@@ -466,7 +500,7 @@ class Layout:
                 (wx.StaticText(sb, label = 'mV'), 0, a),
         ])
         s2.AddMany([
-                (wx.Choice(sb, choices = [str(i) for i in jbd.CuvpHighDelayEnum], name = 'cuvp_high_delay'), 0, a),
+                (EnumChoice(sb, choices = jbd.CuvpHighDelayEnum, name = 'cuvp_high_delay'), 0, a),
                 (wx.StaticText(sb, label = 'S'), 0, a),
         ])
         fgs.AddMany([
@@ -478,7 +512,7 @@ class Layout:
         # SC Release
         s1 = wx.BoxSizer()
         s1.AddMany([
-                (wx.Choice(sb, choices = [str(i) for i in range(256)], name = 'sc_rel'), 0, lflags),
+                (BetterChoice(sb, choices = [str(i) for i in range(256)], name = 'sc_rel'), 0, lflags),
                 (wx.StaticText(sb, label = 'S'), 0, lflags),
         ])
         fgs.AddMany([
@@ -558,7 +592,7 @@ class Layout:
             (wx.StaticText(sb, label = 'mΩ'), 0, a),
         ])
         s2.AddMany([ 
-                (wx.Choice(sb, choices = [str(i) for i in range(1,17)], name='cell_cnt'), 0, a),
+                (BetterChoice(sb, choices = [str(i) for i in range(1,17)], name='cell_cnt'), 0, a),
         ])
         fgs.AddMany([
             (wx.StaticText(sb, label = 'Shunt res'), 0, a), (s1,), 
@@ -792,7 +826,6 @@ class RoundGauge(wx.Panel):
 
         gc.DrawText(s, x,y)
 
-
 class ChildIter:
     ignoredNames = {
         'staticText', 
@@ -842,19 +875,19 @@ class Main(wx.Frame):
         nb_panel = wx.Panel(self)
 
         nb = wx.Notebook(nb_panel)
-        infoTab = wx.Panel(nb)
-        settingsTab = wx.Panel(nb)
+        self.infoTab = wx.Panel(nb)
+        self.settingsTab = wx.Panel(nb)
 
-        layout.infoTabLayout(infoTab)
-        layout.settingsTabLayout(settingsTab)
+        layout.infoTabLayout(self.infoTab)
+        layout.settingsTabLayout(self.settingsTab)
 
-        nb.AddPage(infoTab, 'Info')
-        nb.AddPage(settingsTab, 'Settings')
+        nb.AddPage(self.infoTab, 'Info')
+        nb.AddPage(self.settingsTab, 'Settings')
 
-        for c in ChildIter.iterNamed(settingsTab):
+        for c in ChildIter.iterNamed(self.settingsTab):
             c.Name = 'eeprom_' + c.Name
 
-        for c in ChildIter.iterNamed(infoTab):
+        for c in ChildIter.iterNamed(self.infoTab):
             c.Name = 'info_' + c.Name
             print(c.Name)
 
@@ -904,6 +937,12 @@ class Main(wx.Frame):
     def readEeprom(self):
         worker = EepromWorker(self, self.j)
         worker.run(worker.ReadEeprom)
+
+    def writeEeprom(self):
+        for c in ChildIter.iterNamed(self):
+            if not c.Name.startswith('eeprom_'): continue
+            n = c.Name[7:]
+            print (n, repr(self.get(c.Name)))
 
     def readInfo(self):
         basicInfo = self.j.readBasicInfo()
@@ -967,6 +1006,7 @@ class Main(wx.Frame):
         if isinstance(evt.data, Exception):
             print(f'eeprom error: {repr(evt.data)}')
         else:
+            pprint(evt.data)
             for k,v in evt.data.items():
                 self.set('eeprom_'+k,v)
 
@@ -984,22 +1024,33 @@ class Main(wx.Frame):
         svalue = str(value)
         w = self.FindWindowByName(name)
         if w is None:
-            print(f'unknown field: {name}')
+            print(f'set: unknown field: {name}')
             return
         if isinstance(w, wx.TextCtrl) or isinstance(w, RoundGauge):
             w.SetValue(svalue)
         elif isinstance(w, wx.StaticText):
             w.SetLabel(svalue)
-        elif isinstance(w, BoolImage) or isinstance(w, wx.CheckBox):
+        elif (isinstance(w, BoolImage) or 
+              isinstance(w, wx.CheckBox) or 
+              isinstance(w, BetterChoice)):
             w.SetValue(value)
-        elif isinstance(w, wx.Choice):
-            idx = w.FindString(svalue)
-            if idx == wx.NOT_FOUND: 
-                print(f'cannot set Choice control {w.Name} to unknown choice {svalue}')
-                return
-            w.SetSelection(idx)
         else:
-            print(f'unknown control type: {type(w)}')
+            print(f'set: unknown control type: {type(w)}')
+
+    def get(self, name):
+        w = self.FindWindowByName(name)
+        if w is None:
+            print(f'get: unknown field: {name}')
+            return
+        if (isinstance(w, EnumChoice) or 
+            isinstance(w, wx.TextCtrl) or 
+            isinstance(w, wx.CheckBox) or
+            isinstance(w, BetterChoice)):
+            return w.GetValue()
+        elif isinstance(w, wx.StaticText):
+            return None
+        else:
+            print(f'get: unknown control type {type(w)}')
 
     def onButtonClick(self, evt):
         n = evt.EventObject.Name
