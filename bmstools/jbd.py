@@ -28,9 +28,11 @@ class Unit(Enum):
         self.symbol = symbol
 
 class LabelEnum(Enum):
-    def __init__(self, display, val):
-        self.display = display
-        self.val = val
+    def __new__(cls, display, value):
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.display = display
+        return obj
 
     def __str__(self):
         return str(self.display)
@@ -45,7 +47,7 @@ class LabelEnum(Enum):
     @classmethod
     def byValue(cls, value):
         for v in cls:
-            if value == v.val:
+            if value == v._value_:
                 return v
         return None
 
@@ -189,8 +191,9 @@ class IntReg(BaseReg):
         if not valueName == self._regName:
             raise KeyError(f'unknown value name {valuename}')
         try:
+            value = int(value)
             if not -32768 <= value <= 32767:
-                raise ValueError(f'value {repr(value)} is outside of range(0,65536)')
+                raise ValueError(f'value {repr(value)} is outside of range(-32768, 327670)')
         except:
             raise ValueError(f'value {repr(value)} is not valid for {self.__class__.__name__}')
         self._value = value
@@ -209,6 +212,17 @@ class TempReg(IntReg):
     def __init__(self, valueName, adx):
         super().__init__(valueName, adx, Unit.C, 0)
 
+    def set(self, valueName, value):
+        if not valueName == self._regName:
+            raise KeyError(f'unknown value name {valuename}')
+        try:
+            value = float(value)
+            if not -273.15 <= value <= 6136.4: # maps to 0 --> 65535
+                raise ValueError(f'value {repr(value)} is outside of range(-32768, 327670)')
+        except:
+            raise ValueError(f'value {repr(value)} is not valid for {self.__class__.__name__}')
+        self._value = value
+
     @staticmethod
     def unpackTemp(payload):
         return (struct.unpack('>H', payload)[0] - 2731) / 10
@@ -220,8 +234,8 @@ class TempReg(IntReg):
     def unpack(self, payload):
         self._value = self.unpackTemp(payload)
 
-    def pack(cls, value):
-        return struct.packTemp(value)
+    def pack(cls):
+        return struct.packTemp(self._value)
 
 class TempRegRO(TempReg):
     def set(self, valueName, value):
@@ -771,10 +785,10 @@ savefile_fields =  [
     ('BarCode', 'barcode'),                     # reg
 ]
 
-
-class Settings:
-    def __init__(self, jbd):
-        self.jbd = jbd
+eeprom_reg_by_valuename = {}
+for reg in eeprom_regs:
+    map = {k:reg for k in reg.valueNames}
+    eeprom_reg_by_valuename.update(map)
 
 class JBD:
     START           = 0xDD
@@ -793,6 +807,7 @@ class JBD:
         self._lock = threading.RLock()
         self.timeout = timeout
         self.debug = debug
+
 
     @staticmethod
     def toHex(data):
