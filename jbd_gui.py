@@ -20,8 +20,6 @@ import wx.lib.newevent
 
 import bmstools.jbd as jbd
 
-from statusbar import ProgressBar
-
 try:
     # PyInstaller creates a temp folder and stores path in _MEIPASS
     base_path = sys._MEIPASS
@@ -129,7 +127,7 @@ class BoolImage(SVGImage):
         self.SetImage(self.img1 if bool(which) else self.img2)
         self.Refresh()
 
-class Layout: 
+class LayoutGen: 
     def __init__(self, parent):
         tc = wx.TextCtrl(parent)
         self.txtSize30 = tc.GetSizeFromTextSize(parent.GetTextExtent('9' * 30))
@@ -727,6 +725,38 @@ class Layout:
         fgs.AddMany(gen('SC',    'sc_err_cnt'))
         fgs.Add(wx.Button(sb, label='Clear (fixme)', name='clear_faults_btn'))
 
+class ProgressBar(wx.StatusBar):
+    def __init__(self, parent):
+        self.parent = parent
+        super().__init__(parent=self.parent)
+        self.SetFieldsCount(3)
+        self.SetStatusText('0/0')
+        self.SetStatusText('Mango',1)
+        self.SetStatusWidths([100, 100, -1])
+        gauge_pos, gauge_size = self.get_gauge_dimensions()
+        self.gauge = wx.Gauge (self, -1, 100, gauge_pos, gauge_size)
+        # bindings
+        self.Bind(wx.EVT_SIZE, self.on_size)
+        self.Show()
+
+    def get_gauge_dimensions(self):
+        """Get gauge position and dimensions"""
+        c = self.GetFieldsCount()
+        pos_x, pos_y, dim_x, dim_y = self.GetFieldRect(c-1)
+        return (pos_x, pos_y), (dim_x, dim_y)
+        
+    def on_size(self, event):
+        """Resize gauge when the main frame is resized"""
+        size = self.GetSize()
+        self.SetSize(size)
+        gauge_pos, gauge_size = self.get_gauge_dimensions()
+        self.gauge.SetSize(gauge_size)
+        event.Skip()       
+        self.Update()
+ 
+    def SetValue(self, value):
+        self.gauge.SetValue(value)
+
 class RoundGauge(wx.Panel):
 
     def __init__(self, *args, **kwargs):
@@ -869,7 +899,7 @@ class Main(wx.Frame):
         font = wx.Font(8, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         self.SetFont(font)
 
-        layout = Layout(self)
+        layout = LayoutGen(self)
 
         # tabs layout
         nb_panel = wx.Panel(self)
@@ -915,9 +945,8 @@ class Main(wx.Frame):
 
         sizer.Add(bot_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
-        if 0:
-            p = ProgressBar(self)
-            self.SetStatusBar(p)
+        p = ProgressBar(self)
+        self.SetStatusBar(p)
 
         self.Bind(EepromWorker.EVT_EEP_PROG, self.onProgress)
         self.Bind(EepromWorker.EVT_EEP_DONE, self.onEepromDone)
@@ -1003,7 +1032,7 @@ class Main(wx.Frame):
             self.set('info_' + f,basicInfo[f])
 
     def onProgress(self, evt):
-        print(f'progress {evt.value}')
+        self.GetStatusBar().SetValue(evt.value)
 
     def onEepromDone(self, evt):
         print('eeprom done')
@@ -1074,10 +1103,6 @@ class Main(wx.Frame):
         else:
             print(f'unknown button {n}')
 
-
-
-
-
 class EepromWorker:
     EepProg, EVT_EEP_PROG = wx.lib.newevent.NewEvent()
     EepDone, EVT_EEP_DONE = wx.lib.newevent.NewEvent()
@@ -1096,6 +1121,8 @@ class EepromWorker:
             wx.PostEvent(self.parent, self.EepDone(data = data))
         except Exception as e:
             wx.PostEvent(self.parent, self.EepDone(data = e))
+        finally:
+            wx.PostEvent(self.parent, self.EepProg(value = 100))
 
     def WriteEeprom(self, data):
         try:
@@ -1103,6 +1130,8 @@ class EepromWorker:
             wx.PostEvent(self.parent, self.EepDone(data = None))
         except Exception as e:
             wx.PostEvent(self.parent, self.EepDone(data = e))
+        finally:
+            wx.PostEvent(self.parent, self.EepProg(value = 100))
 
     def run(self, func, *args, **kwargs):
         self.thr = threading.Thread(target = func, args = args, kwargs = kwargs)
