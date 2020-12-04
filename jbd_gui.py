@@ -939,10 +939,13 @@ class Main(wx.Frame):
         worker.run(worker.ReadEeprom)
 
     def writeEeprom(self):
+        data = {}
         for c in ChildIter.iterNamed(self):
             if not c.Name.startswith('eeprom_'): continue
             n = c.Name[7:]
-            print (n, repr(self.get(c.Name)))
+            data[n] = self.get(c.Name)
+        worker = EepromWorker(self, self.j)
+        worker.run(worker.WriteEeprom, data)
 
     def readInfo(self):
         basicInfo = self.j.readBasicInfo()
@@ -1003,12 +1006,16 @@ class Main(wx.Frame):
         print(f'progress {evt.value}')
 
     def onEepromDone(self, evt):
+        print('eeprom done')
         if isinstance(evt.data, Exception):
+            traceback.print_tb(evt.data.__traceback__)
             print(f'eeprom error: {repr(evt.data)}')
-        else:
+        elif evt.data is not None:
             pprint(evt.data)
             for k,v in evt.data.items():
                 self.set('eeprom_'+k,v)
+        else:
+            pass # was eeprom write ...
 
     def setupClockTimer(self):
         self.clockTimer = wx.Timer(self)
@@ -1091,7 +1098,11 @@ class EepromWorker:
             wx.PostEvent(self.parent, self.EepDone(data = e))
 
     def WriteEeprom(self, data):
-        print('WriteEeprom not implemented')
+        try:
+            self.j.writeEeprom(data, self.progress)
+            wx.PostEvent(self.parent, self.EepDone(data = None))
+        except Exception as e:
+            wx.PostEvent(self.parent, self.EepDone(data = e))
 
     def run(self, func, *args, **kwargs):
         self.thr = threading.Thread(target = func, args = args, kwargs = kwargs)
