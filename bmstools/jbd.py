@@ -120,6 +120,9 @@ class BaseReg:
         'return a list of values this register covers'
         return self._valueNames
 
+    def __repr__(self):
+        return f'<{self.__class__.__name__}: {self.regName}>'
+
     @property
     def unit(self, valueName):
         'return the unit for this value'
@@ -164,13 +167,28 @@ class BaseReg:
     def items(self):
         return self._toDict().items()
 
+class ReadOnlyException(RuntimeError): pass
+class ReadOnlyMixin:
+    def set(self, valueName, value):
+        raise ReadOnlyException(f'{self._regName} is read-only')
+
+    def pack(self):
+        raise ReadOnlyException(f'{self._regName} is read-only')
+
+
 class IntReg(BaseReg): 
-    def __init__(self, regName, adx, unit, factor):
+    def __init__(self, regName, adx, unit, factor, range=(-32768, 32768)):
         self._regName = regName
         self._adx = adx
         self._unit = unit
         self._value = 0
         self._factor = factor # multiplier for (un)packing
+        assert type(range) in (list, tuple) and len(range) == 2 and all([type(i) == int for i in range])
+        self.range = tuple((i * factor for i in range))
+        if self.range[0] >= 0:
+            self.format = '>H'
+        else:
+            self.format = '>h'
 
     @property
     def valueNames(self):
@@ -190,19 +208,20 @@ class IntReg(BaseReg):
     def set(self, valueName, value):
         if not valueName == self._regName:
             raise KeyError(f'unknown value name {valuename}')
+        value = value or 0
         try:
-            value = int(value)
-            if not -32768 <= value <= 32767:
-                raise ValueError(f'value {repr(value)} is outside of range(-32768, 327670)')
-        except:
+            value = float(value)
+            if value < self.range[0] or value > self.range[1]:
+                raise ValueError(f'value {repr(value)} is outside of range {self.range}')
+        except Exception as e:
             raise ValueError(f'value {repr(value)} is not valid for {self.__class__.__name__}')
         self._value = value
 
     def unpack(self, payload):
-        self._value = struct.unpack('>h', payload)[0] * self._factor
+        self._value = struct.unpack(self.format, payload)[0] * self._factor
 
     def pack(self):
-        return struct.pack('>h', self._value // self._factor)
+        return struct.pack(self.format, self._value // self._factor)
 
     def __str__(self):
         return f'{self._regName}: {self._value}'
@@ -237,14 +256,9 @@ class TempReg(IntReg):
     def pack(cls):
         return struct.packTemp(self._value)
 
-class TempRegRO(TempReg):
-    def set(self, valueName, value):
-        RuntimeError(f'{self._regName} is read-only')
+class TempRegRO(TempReg, ReadOnlyMixin): pass
 
-    def pack(self):
-        RuntimeError(f'{self._regName} is read-only')
-
-class ErrorCountReg(BaseReg):
+class ErrorCountReg(ReadOnlyMixin, BaseReg):
     def __init__(self, regName, adx):
         self._regName = regName
         self._adx = adx
@@ -266,18 +280,6 @@ class ErrorCountReg(BaseReg):
     def get(self, valueName):
         return self._values[valueName]
     
-    def set(self, valueName, value):
-        if valueName not in self._values:
-            raise KeyError(valueName)
-
-        try:
-            if not 0 <= value <= 65535:
-                raise ValueError(f'value {repr(value)} is outside of range(0,65536)')
-        except:
-            raise ValueError(f'value {repr(value)} is not valid for {self.__class__.__name__}')
-        
-        self._values[valueName] = int(value)
-    
     def unpack(self, payload):
         values = struct.unpack('>11H', payload)
         self._values = dict(zip(self._values.keys(), values))
@@ -292,12 +294,17 @@ class DelayReg(BaseReg):
 
     def get(self, valueName):
         return self._values[valueName]
-    
-    def set(self, valueName, Value):
-        if valueNames not in self._values:
+
+    def set(self, valueName, value):
+        if valueName not in self._values:
             raise KeyError(valueName)
-        if not 0 <= value <= 255:
-            raise ValueError(value)
+        value = value or 0
+        try:
+            value = int(value)
+            if not 0 <= value <= 255:
+                raise ValueError(f'value {repr(value)} is outside of range(0, 255)')
+        except:
+            raise ValueError(f'value {repr(value)} is not valid for {self.__class__.__name__}')
         self._values[valueName] = value
 
     def __str__(self):
@@ -312,7 +319,8 @@ class DelayReg(BaseReg):
         self._values = dict(zip(self._values.keys(), values))
 
     def pack(self):
-        return struct.pack('>2B', self._values.values())
+        return struct.pack('>2B', *self._values.values())
+
 
 class BitfieldReg(BaseReg):
     def __init__(self, regName, adx, *fields):
@@ -329,7 +337,7 @@ class BitfieldReg(BaseReg):
         return self._values[valueName]
     
     def set(self, valueName, value):
-        if valueNames not in self._values:
+        if valueName not in self._values:
             raise KeyError(valueName)
         self._values[valueName] = bool(value)
 
@@ -363,7 +371,7 @@ class StringReg(BaseReg):
         if not valueName == self._regName:
             raise KeyError(f'unknown value name {valuename}')
 
-        if type(value) not in (str, byte, bytearray):
+        if type(value) not in (str, bytes, bytearray):
             raise ValueError(f'value should be str, byte, or bytearray')
         if len(value) > 30:
             raise ValueError(f'string length should not exceed 30')
@@ -389,7 +397,7 @@ class DateReg(BaseReg):
         self._year = 0
         self._month = 0
         self._day = 0
-        self._yearRange = range(1,128)
+        self._yearRange = range(2000,2128)
         self._monthRange = range(1,13)
         self._dayRange = range(1,32)
 
@@ -401,8 +409,9 @@ class DateReg(BaseReg):
     def set(self, valueName, value):
         if valueName not in self._valueNames:
             raise KeyError(valueName)
-        if value not in getattr(self, valueName + 'Range'):
-            raise ValueError(f'invalid value for {valueName}: value')
+        value = int(value)
+        if value not in getattr(self, f'_{valueName}Range'):
+            raise ValueError(f'invalid value for {valueName}: {repr(value)}')
         setattr(self, '_'+valueName, value)
 
     def __str__(self):
@@ -468,7 +477,8 @@ class ScDsgoc2Reg(BaseReg):
             self._dsgoc2_delay = value
         elif valueName == 'sc_dsgoc_x2':
             self._sc_dsgoc_x2 = bool(value)
-        raise KeyError(valueName)
+        else:
+            raise KeyError(valueName)
 
     def unpack(self, payload):
         b1, b2 = struct.unpack('>BB', payload)
@@ -518,10 +528,13 @@ class CxvpHighDelayScRelReg(BaseReg):
                 raise ValueError(value)
             self._covp_high_delay = value
         elif valueName == 'sc_rel':
+            value = value or 0
+            value = int(value)
             if value not in range(256):
                 raise ValueError(value)
             self._sc_rel = value
-        raise KeyError(valueName)
+        else:
+            raise KeyError(valueName)
 
     def unpack(self, payload):
         b1, self._sc_rel = struct.unpack('>BB', payload)
@@ -790,6 +803,8 @@ for reg in eeprom_regs:
     map = {k:reg for k in reg.valueNames}
     eeprom_reg_by_valuename.update(map)
 
+class BMSError(Exception): pass
+
 class JBD:
     START           = 0xDD
     END             = 0x77
@@ -798,7 +813,7 @@ class JBD:
 
     def __init__(self, s, timeout = 3, debug = False):
         self.s = s
-        s.timeout=.25
+        s.timeout=0.5
         try:
             self.s.close()
         except: 
@@ -869,6 +884,7 @@ class JBD:
         then = time.time() + self.timeout
         d = []
         msgLen = 0
+        complete = False
         while then > time.time():
             byte = self.s.read()
             if not byte: break
@@ -876,12 +892,15 @@ class JBD:
             d.append(byte)
             if len(d) == 4:
                 msgLen = d[-1]
-            if byte == 0x77 and len(d) == 7 + msgLen: break
-        if d:
+            if byte == 0x77 and len(d) == 7 + msgLen: 
+                complete = True
+                break
+        if d and complete:
             self.dbgPrint('readPacket:', self.toHex(d))
-            return self.extractPayload(bytes(d))
+            ok = not d[2]
+            return ok, self.extractPayload(bytes(d))
         self.dbgPrint(f'readPacket failed with {len(d)} bytes')
-        return None
+        return False, None
 
     def enterFactory(self):
         try:
@@ -890,8 +909,8 @@ class JBD:
             while cnt:
                 cmd = self.writeCmd(0, [0x56, 0x78])
                 self.s.write(cmd)
-                x = self.readPacket()
-                if x is not None: # empty payload is valid
+                ok, x = self.readPacket()
+                if ok and x is not None: # empty payload is valid
                     self.dbgPrint('pong')
                     return x
                 self.dbgPrint('no response')
@@ -906,7 +925,8 @@ class JBD:
             self.open()
             cmd = self.writeCmd(1,  [0x28, 0x28] if clearErrors else [0,0])
             self.s.write(cmd)
-            return self.readPacket()
+            ok, d = self.readPacket()
+            return ok
         finally:
             self.close()
 
@@ -921,7 +941,8 @@ class JBD:
             for i, reg in enumerate(eeprom_regs):
                 cmd = self.readCmd(reg.adx)
                 self.s.write(cmd)
-                payload = self.readPacket()
+                ok, payload = self.readPacket()
+                if not ok: raise BMSError()
                 if payload is None: raise TimeoutError()
                 if progressFunc: progressFunc(int(i / (numRegs-1) * 100))
                 reg.unpack(payload)
@@ -931,13 +952,50 @@ class JBD:
         finally:
             self.close()
 
+    def writeEeprom(self, data, progressFunc = None):
+        try:
+            self.open()
+            self.enterFactory()
+            ret = {}
+            numRegs = len(eeprom_regs)
+            if progressFunc: progressFunc(0)
+            regs = set()
+
+            for valueName, value in data.items():
+                reg = eeprom_reg_by_valuename.get(valueName)
+                if not reg: raise RuntimeError(f'unknown valueName {valueName}')
+                regs.add(reg)
+                try:
+                    reg.set(valueName, value)
+                except ReadOnlyException:
+                    print(f'skipping read-only valueName {valueName}')
+
+            print('regs found:', regs)
+
+            
+            if 0:
+                for i, reg in enumerate(eeprom_regs):
+                    cmd = self.readCmd(reg.adx)
+                    self.s.write(cmd)
+                    ok, payload = self.readPacket()
+                    if not ok: raise BMSError()
+                    if payload is None: raise TimeoutError()
+                    if progressFunc: progressFunc(int(i / (numRegs-1) * 100))
+                    reg.unpack(payload)
+                    ret.update(dict(reg))
+                self.exitFactory()
+                return ret
+        finally:
+            self.close()
+
     def readBasicInfo(self):
         try:
             self.open()
             self.exitFactory()
             cmd = self.readCmd(basicInfoReg.adx)
             self.s.write(cmd)
-            payload = self.readPacket()
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
             if payload is None: raise TimeoutError()
             basicInfoReg.unpack(payload)
             return dict(basicInfoReg)
@@ -950,7 +1008,8 @@ class JBD:
             self.exitFactory()
             cmd = self.readCmd(cellInfoReg.adx)
             self.s.write(cmd)
-            payload = self.readPacket()
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
             if payload is None: raise TimeoutError()
             cellInfoReg.unpack(payload)
             return dict(cellInfoReg)
@@ -963,7 +1022,8 @@ class JBD:
             self.exitFactory()
             cmd = self.readCmd(deviceInfoReg.adx)
             self.s.write(cmd)
-            payload = self.readPacket()
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
             if payload is None: raise TimeoutError()
             deviceInfoReg.unpack(payload)
             return dict(deviceInfoReg)
