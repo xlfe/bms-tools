@@ -27,6 +27,9 @@ class Unit(Enum):
         self.long_name = long_name
         self.symbol = symbol
 
+def hexDump(d):
+    print(' '.join(f'{i:02X}' for i in d))
+    
 class LabelEnum(Enum):
     def __new__(cls, display, value):
         obj = object.__new__(cls)
@@ -221,7 +224,7 @@ class IntReg(BaseReg):
         self._value = struct.unpack(self.format, payload)[0] * self._factor
 
     def pack(self):
-        return struct.pack(self.format, self._value // self._factor)
+        return struct.pack(self.format, int(self._value // self._factor))
 
     def __str__(self):
         return f'{self._regName}: {self._value}'
@@ -970,7 +973,20 @@ class JBD:
                 except ReadOnlyException:
                     print(f'skipping read-only valueName {valueName}')
 
-            print('regs found:', regs)
+            toWrite = set('ntc1 led_en covp covp_rel covp_delay'.split())
+            
+            for i,reg in enumerate(regs):
+                if toWrite & set(reg.valueNames):
+                    data = reg.pack()
+                    cmd = self.writeCmd(reg.adx, data)
+                    self.s.write(cmd)
+                    ok, payload = self.readPacket()
+                    if not ok: raise BMSError()
+                    if payload is None: raise TimeoutError()
+                    hexDump(cmd)
+                if progressFunc: progressFunc(int(i / (numRegs-1) * 100))
+
+
 
             
             if 0:
