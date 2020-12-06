@@ -17,6 +17,7 @@ import wx.grid
 import wx.svg
 import wx.lib.scrolledpanel as scrolled
 import wx.lib.newevent
+import wx.lib.masked.numctrl
 
 import bmstools.jbd as jbd
 
@@ -126,6 +127,50 @@ class BoolImage(SVGImage):
     def SetValue(self, which):
         self.SetImage(self.img1 if bool(which) else self.img2)
         self.Refresh()
+
+class IntValidator(wx.Validator):
+    def __init__(self, lower, upper):
+        super().__init__()
+        self.lower = lower
+        self.upper = upper
+
+    def Clone(self):
+        print('clone')
+        return self.__class__(self.lower, self.upper)
+
+    def Validate(self, win):
+        print('validate')
+            
+        return True
+
+        textCtrl = self.GetWindow()
+        text = textCtrl.GetValue()
+        print('got value:', text)
+
+        if text.isdigit():
+            return True
+        else:
+            wx.MessageBox("Please enter numbers only", "Invalid Input",
+            wx.OK | wx.ICON_ERROR)
+        return False
+
+    def TransferToWindow(self):
+        print('xferto')
+        return True
+
+    def TransferFromWindow(self):
+        print('xferfrom')
+        return True
+
+    def OnChar(self, event):
+        print('onchar')
+        keycode = int(event.GetKeyCode())
+        if keycode < 256:
+            key = chr(keycode)
+            if key not in string.digits:
+                return
+        event.Skip()
+
 
 class LayoutGen: 
     def __init__(self, parent):
@@ -396,7 +441,8 @@ class LayoutGen:
             unit2 = unit2 or unit1
             items = [
                 (wx.StaticText(sb, label = fn.upper()), 0, rflags),
-                (wx.TextCtrl(sb, name = fn, size = self.txtSize6), 0, lflags),
+                #(wx.lib.masked.numctrl.NumCtrl(sb, name = fn, size = self.txtSize6), 0, lflags),
+                (wx.lib.masked.numctrl.NumCtrl(sb, name = fn, integerWidth=6), 0, lflags),
                 (wx.StaticText(sb, label = unit1), 0, lflags),
                 colGap,
                 (wx.StaticText(sb, label = 'Rel'), 0, rflags),
@@ -655,6 +701,8 @@ class LayoutGen:
         write_btn = wx.Button(sb, label='Write EEPROM', name='write_eeprom_btn')
         load_btn = wx.Button(sb, label='Load EEPROM', name='load_eeprom_btn')
         save_btn = wx.Button(sb, label='Save EEPROM', name='save_eeprom_btn')
+        write_btn.Enable(False)
+        save_btn.Enable(False)
 
         fgs.Add(read_btn, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
         fgs.Add(0,0)
@@ -723,7 +771,7 @@ class LayoutGen:
         fgs.AddMany(gen('POVP',  'povp_err_cnt',  'PUVP',  'puvp_err_cnt'))
         fgs.AddMany(gen('COVP',  'covp_err_cnt',  'CUVP',  'cuvp_err_cnt'))
         fgs.AddMany(gen('SC',    'sc_err_cnt'))
-        fgs.Add(wx.Button(sb, label='Clear (fixme)', name='clear_faults_btn'))
+        fgs.Add(wx.Button(sb, label='Clear', name='clear_errors_btn'))
 
 class ProgressBar(wx.StatusBar):
     def __init__(self, parent):
@@ -1043,6 +1091,8 @@ class Main(wx.Frame):
             pprint(evt.data)
             for k,v in evt.data.items():
                 self.set('eeprom_'+k,v)
+            self.FindWindowByName('write_eeprom_btn').Enable(True)
+            self.FindWindowByName('save_eeprom_btn').Enable(True)
         else:
             pass # was eeprom write ...
 
@@ -1090,6 +1140,7 @@ class Main(wx.Frame):
 
     def onButtonClick(self, evt):
         n = evt.EventObject.Name
+        
         if n == 'read_eeprom_btn':
             self.readEeprom()
         elif n == 'write_eeprom_btn':
@@ -1099,9 +1150,28 @@ class Main(wx.Frame):
         elif n == 'save_eeprom_btn':
             self.saveEeprom()
         elif n == 'test_btn':
-            self.readInfo()
+            print('skipping read info -- validate')
+            #self.readInfo()
+            self.Validate()
+        elif n == 'clear_errors_btn':
+            self.clearErrors()
         else:
             print(f'unknown button {n}')
+
+    def clearErrors(self):
+        try:
+            self.j.clearErrors()
+
+            for c in ChildIter.iterNamed(self):
+                if not c.Name.endswith('_err_cnt'): continue
+                if not c.Name.startswith('eeprom_'): continue
+                print(c.Name)
+                c.SetLabel('0')
+        except jbd.BMSError:
+            self.setStatus('BMS comm error')
+
+    def setStatus(self, t):
+        self.GetStatusBar().SetStatusText(t)
 
 class EepromWorker:
     EepProg, EVT_EEP_PROG = wx.lib.newevent.NewEvent()
@@ -1151,7 +1221,7 @@ releaseDate = 'N/A'
     
 class MyApp(wx.App):
     def OnInit(self):
-        frame = Main(None, title = f'{appName} {appVersion}' )
+        frame = Main(None, title = f'{appName} {appVersion}',style = wx.DEFAULT_FRAME_STYLE | wx.WS_EX_VALIDATE_RECURSIVELY )
         frame.SetIcon(wx.Icon(os.path.join(base_path, 'img', 'batt_icon_128.ico')))
         frame.Show()
         return True
