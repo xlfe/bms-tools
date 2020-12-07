@@ -33,7 +33,7 @@ def hexDump(d):
 class LabelEnum(Enum):
     def __new__(cls, display, value):
         obj = object.__new__(cls)
-        obj._value_ = value
+        obj.val = value
         obj.display = display
         return obj
 
@@ -50,7 +50,7 @@ class LabelEnum(Enum):
     @classmethod
     def byValue(cls, value):
         for v in cls:
-            if value == v._value_:
+            if value == v.val:
                 return v
         return None
 
@@ -256,8 +256,8 @@ class TempReg(IntReg):
     def unpack(self, payload):
         self._value = self.unpackTemp(payload)
 
-    def pack(cls):
-        return struct.packTemp(self._value)
+    def pack(self):
+        return self.packTemp(self._value)
 
 class TempRegRO(TempReg, ReadOnlyMixin): pass
 
@@ -383,7 +383,7 @@ class StringReg(BaseReg):
 
     def pack(self):
         l = len(self._value)
-        return struct.pack(f'>B{l}S', l, self._value)
+        return struct.pack(f'>B{l}s', l, bytes(self._value, 'utf-8'))
 
     def unpack(self, payload):
         l = payload[0]
@@ -432,7 +432,7 @@ class DateReg(BaseReg):
 
     @staticmethod
     def packDate(year, month, day):
-        value = year
+        value = (year - 2000) & 0x7f
         value <<= 4
         value |= month
         value <<= 5
@@ -488,7 +488,7 @@ class ScDsgoc2Reg(BaseReg):
 
         self._sc_dsgoc_x2 = bool(b1 & 0x80)
 
-        sc = b1 & 0x3
+        sc = b1 & 0x7
         sc_delay = (b1 >> 3) & 0x3
 
         self._sc = ScEnum.byValue(sc) or ScEnum._22MV
@@ -503,7 +503,7 @@ class ScDsgoc2Reg(BaseReg):
     def pack(self):
         x2 = 0x80 if self._sc_dsgoc_x2 else 0
         b1 = self._sc.val | (self._sc_delay.val << 3) | x2
-        b2 = self._dsgoc2_delay | (self._dsgoc2 << 4)
+        b2 = (self._dsgoc2_delay.val << 4) | self._dsgoc2.val
         return struct.pack('>BB', b1, b2)
 
 class CxvpHighDelayScRelReg(BaseReg):
@@ -657,154 +657,79 @@ class DeviceInfoReg(BaseReg):
         except UnicodeDecodeError:
             self._device_name = payload
         
-basicInfoReg = BasicInfoReg('basic_info', 0x03)
-cellInfoReg = CellInfoReg('cell_info', 0x04)
-deviceInfoReg = DeviceInfoReg('device_info', 0x05)
 
-eeprom_regs = [
-    ### EEPROM settings
-    ## Settings
-    # Basic Parameters
-    IntReg('covp', 0x24, Unit.MV, 1),
-    IntReg('covp_rel', 0x25, Unit.MV, 1),
-    IntReg('cuvp', 0x26, Unit.MV, 1),
-    IntReg('cuvp_rel', 0x27, Unit.MV, 1),
-    IntReg('povp', 0x20, Unit.MV, 1),
-    IntReg('povp_rel', 0x21, Unit.MV, 10),
-    IntReg('puvp', 0x22, Unit.MV, 10),
-    IntReg('puvp_rel', 0x23, Unit.MV, 10),
-    TempReg('chgot', 0x18),
-    TempReg('chgot_rel', 0x19),
-    TempReg('chgut', 0x1a),
-    TempReg('chgut_rel', 0x1b),
-    TempReg('dsgot', 0x1c),
-    TempReg('dsgot_rel', 0x1d),
-    TempReg('dsgut', 0x1e),
-    TempReg('dsgut_rel', 0x1f),
-    IntReg('chgoc', 0x28, Unit.MA, 10),
-    IntReg('dsgoc', 0x29, Unit.MA, 10),
-    DelayReg('cell_v_delays', 0x3d, 'cuvp_delay', 'covp_delay'),
-    DelayReg('pack_v_delays', 0x3c, 'puvp_delay', 'povp_delay'),
-    DelayReg('chg_t_delays', 0x3a, 'chgut_delay', 'chgot_delay'),
-    DelayReg('dsg_t_delays', 0x3b, 'dsgut_delay', 'dsgot_delay'),
-    DelayReg('chgoc_delays', 0x3e, 'chgoc_delay', 'chgoc_rel'),
-    DelayReg('dsgoc_delays', 0x3f, 'dsgoc_delay', 'dsgoc_rel'),
+class JBDPersist:
+    pass
 
-    # High Protection Configuration
-    IntReg('covp_high', 0x36, Unit.MV, 1),
-    IntReg('cuvp_high', 0x37, Unit.MV, 1),
-    ScDsgoc2Reg('sc_dsgoc2', 0x38),
-    CxvpHighDelayScRelReg('cxvp_high_delay_sc_rel', 0x39),
+    
+#savefile_fields =  [
+#    #'FileCode' __unknown__ 3838
+#    ('DesignCapacity', ('design_ca,) int)           # reg
+#    ('CycleCapacity', ('cycle_ca,) int)             # reg
+#    ('FullChargeVol', ('cap_10,) int)               # reg
+#    ('ChargeEndVol', ('cap_,) int)                  # reg
+#    ('DischargingRate', ('dsg_rat,) int)            # reg
+#    ('ManufactureDate', ('mfg_dat,) int)            # reg
+#    ('SerialNumber', ('serial_nu,) int)             # reg
+#    ('CycleCount', ('cycle_cn,) int)                # reg
+#    ('ChgOverTemp', ('chgo,) int)                   # reg
+#    ('ChgOTRelease', ('chgot_re,) int)              # reg
+#    ('ChgLowTemp', ('chgu,) int)                    # reg
+#    ('ChgUTRelease', ('chgut_re,) int)              # reg
+#    ('DisOverTemp', ('dsgo,) int)                   # reg
+#    ('DsgOTRelease', ('dsgot_re,) int)              # reg
+#    ('DisLowTemp', ('dsgut') ,                   # reg
+#    ('DsgUTRelease', ('dsgut_re,) int)              # reg
+#    ('PackOverVoltage', ('pov,) int)                # reg
+#    ('PackOVRelease', ('povp_re,) int)              # reg
+#    ('PackUnderVoltage', ('puv,) int)               # reg
+#    ('PackUVRelease', ('puvp_re,) int)              # reg
+#    ('CellOverVoltage', ('cov,) int)                # reg
+#    ('CellOVRelease', ('covp_re,) int)              # reg
+#    ('CellUnderVoltage', ('cuv,) int)               # reg
+#    ('CellUVRelease', ('cuvp_re,) int)              # reg
+#    ('OverChargeCurrent', ('chgo,) int)             # reg
+#    ('OverDisCurrent', ('dsgo,) int)                # reg
+#    ('BalanceStartVoltage', ('bal_star,) int)       # reg
+#    ('BalanceWindow', ('bal_windo,) int)            # reg
+#    ('SenseResistor', ('current_re,) int)           # reg
+#    ('BatteryConfig', ('func_confi,) int)           # reg
+#    ('NtcConfig', ('ntc_confi,) int)                # reg
+#    ('PackNum', ('cell_cn,) int)                    # reg
+#    ('fet_ctrl_time_set', ('fet_ctr,) int)          # reg
+#    ('led_disp_time_set', ('led_time,) int)         # reg
+#    ('VoltageCap80', ('cap_8,) int)                 # reg
+#    ('VoltageCap60', ('cap_6,) int)                 # reg
+#    ('VoltageCap40', ('cap_4,) int)                 # reg
+#    ('VoltageCap20', ('cap_2,) int)                 # reg
+#    ('HardCellOverVoltage', ('covp_hig,) int)       # reg
+#    ('HardCellUnderVoltage', ('cuvp_hig,) int)      # reg
+#
+#    ('HardChgOverCurrent', ( 'sc,: ('sc_dela,': ('sc_dsgoc2)', int)
+#    ('HardDsgOverCurrent', ('dsgoc2,: ('dsgoc2_del'), int)
+#
+#    ('HardTime', ('covp_high_delay,: ('cuvp_high_del'), int)
+#    ('SCReleaseTime', ('sc_re,) int)
+#
+#
+#    ('ChgUTDelay', ('chgut_dela,) int)              # field
+#    ('ChgOTDelay', ('chgot_dela,) int)              # field
+#    ('DsgUTDelay', ('dsgut_dela,) int)              # field
+#    ('DsgOTDelay', ('dsgot_dela,) int)              # field
+#    ('PackUVDelay', ('puvp_dela,) int)              # field
+#    ('PackOVDelay', ('povp_dela,) int)              # field
+#    ('CellUVDelay', ('cuvp_dela,) int)              # field
+#    ('CellOVDelay', ('covp_dela,) int)              # field
+#    ('ChgOCDelay', ('chgoc_dela,) int)              # field
+#    ('ChgOCRDelay', ('chgoc_re,) int)               # field
+#    ('DsgOCDelay', ('dsgoc_dela,) int)              # field
+#    ('DsgOCRDelay', ('dsgoc_re,) int)               # field
+#
+#    ('ManufacturerName', ('mfg_nam,) int)           # reg
+#    ('DeviceName', ('device_nam,) int)              # reg
+#    ('BarCode', ('barcod,) int)                     # reg
+#]
 
-    # Function Configuration
-    BitfieldReg('func_config', 0x2d, 'switch', 'scrl', 'balance_en', 'chg_balance_en', 'led_en', 'led_num'),
-
-    # NTC Configuration
-    BitfieldReg('ntc_config', 0x2e, *(f'ntc{i+1}' for i in range(8))),
-
-    # Balance Configuration
-    IntReg('bal_start', 0x2a, Unit.MV, 1),
-    IntReg('bal_window', 0x2b, Unit.MV, 1),
-
-    # Other Configuration
-    IntReg('shunt_res', 0x2c, Unit.MO, .1),
-    IntReg('cell_cnt', 0x2f, int, 1),
-    IntReg('cycle_cnt', 0x17, int, 1),
-    IntReg('serial_num', 0x16, int, 1),
-    StringReg('mfg_name', 0xa0),
-    StringReg('device_name', 0xa1),
-    StringReg('barcode', 0xa2),
-    DateReg('mfg_date', 0x15),
-
-    # Capacity Config
-    IntReg('design_cap', 0x10, Unit.MAH, 10), 
-    IntReg('cycle_cap', 0x11, Unit.MAH, 10),
-    IntReg('dsg_rate', 0x14, Unit.PCT, .1), # presuming this means rate of self-discharge
-    IntReg('cap_100', 0x12, Unit.MV, 1), # AKA "Full Chg Vol"
-    IntReg('cap_80', 0x32, Unit.MV, 1),
-    IntReg('cap_60', 0x33, Unit.MV, 1),
-    IntReg('cap_40', 0x34, Unit.MV, 1),
-    IntReg('cap_20', 0x35, Unit.MV, 1),
-    IntReg('cap_0', 0x13, Unit.MV, 1), # AKA "End of Dsg VOL"
-    IntReg('fet_ctrl', 0x30, Unit.S, 1),
-    IntReg('led_timer', 0x31, Unit.S, 1),
-
-    # Errors
-    ErrorCountReg('error_cnts', 0xaa),
-]
-
-savefile_fields =  [
-    #'FileCode' __unknown__ 3838
-    ('DesignCapacity', 'design_cap'),           # reg
-    ('CycleCapacity', 'cycle_cap'),             # reg
-    ('FullChargeVol', 'cap_100'),               # reg
-    ('ChargeEndVol', 'cap_0'),                  # reg
-    ('DischargingRate', 'dsg_rate'),            # reg
-    ('ManufactureDate', 'mfg_date'),            # reg
-    ('SerialNumber', 'serial_num'),             # reg
-    ('CycleCount', 'cycle_cnt'),                # reg
-    ('ChgOverTemp', 'chgot'),                   # reg
-    ('ChgOTRelease', 'chgot_rel'),              # reg
-    ('ChgLowTemp', 'chgut'),                    # reg
-    ('ChgUTRelease', 'chgut_rel'),              # reg
-    ('DisOverTemp', 'dsgot'),                   # reg
-    ('DsgOTRelease', 'dsgot_rel'),              # reg
-    ('DisLowTemp', 'dsgut' ),                   # reg
-    ('DsgUTRelease', 'dsgut_rel'),              # reg
-    ('PackOverVoltage', 'povp'),                # reg
-    ('PackOVRelease', 'povp_rel'),              # reg
-    ('PackUnderVoltage', 'puvp'),               # reg
-    ('PackUVRelease', 'puvp_rel'),              # reg
-    ('CellOverVoltage', 'covp'),                # reg
-    ('CellOVRelease', 'covp_rel'),              # reg
-    ('CellUnderVoltage', 'cuvp'),               # reg
-    ('CellUVRelease', 'cuvp_rel'),              # reg
-    ('OverChargeCurrent', 'chgoc'),             # reg
-    ('OverDisCurrent', 'dsgoc'),                # reg
-    ('BalanceStartVoltage', 'bal_start'),       # reg
-    ('BalanceWindow', 'bal_window'),            # reg
-    ('SenseResistor', 'current_res'),           # reg
-    ('BatteryConfig', 'func_config'),           # reg
-    ('NtcConfig', 'ntc_config'),                # reg
-    ('PackNum', 'cell_cnt'),                    # reg
-    ('fet_ctrl_time_set', 'fet_ctrl'),          # reg
-    ('led_disp_time_set', 'led_timer'),         # reg
-    ('VoltageCap80', 'cap_80'),                 # reg
-    ('VoltageCap60', 'cap_60'),                 # reg
-    ('VoltageCap40', 'cap_40'),                 # reg
-    ('VoltageCap20', 'cap_20'),                 # reg
-    ('HardCellOverVoltage', 'covp_high'),       # reg
-    ('HardCellUnderVoltage', 'cuvp_high'),      # reg
-
-    ('HardChgOverCurrent',  'sc', 'sc_delay', 'sc_dsgoc_x2'),
-    ('HardDsgOverCurrent', 'dsgoc2', 'dsgoc2_delay'),
-
-    ('HardTime', 'covp_high_delay', 'cuvp_high_delay'),
-    ('SCReleaseTime', 'sc_rel'),
-
-
-    ('ChgUTDelay', 'chgut_delay'),              # field
-    ('ChgOTDelay', 'chgot_delay'),              # field
-    ('DsgUTDelay', 'dsgut_delay'),              # field
-    ('DsgOTDelay', 'dsgot_delay'),              # field
-    ('PackUVDelay', 'puvp_delay'),              # field
-    ('PackOVDelay', 'povp_delay'),              # field
-    ('CellUVDelay', 'cuvp_delay'),              # field
-    ('CellOVDelay', 'covp_delay'),              # field
-    ('ChgOCDelay', 'chgoc_delay'),              # field
-    ('ChgOCRDelay', 'chgoc_rel'),               # field
-    ('DsgOCDelay', 'dsgoc_delay'),              # field
-    ('DsgOCRDelay', 'dsgoc_rel'),               # field
-
-    ('ManufacturerName', 'mfg_name'),           # reg
-    ('DeviceName', 'device_name'),              # reg
-    ('BarCode', 'barcode'),                     # reg
-]
-
-eeprom_reg_by_valuename = {}
-for reg in eeprom_regs:
-    map = {k:reg for k in reg.valueNames}
-    eeprom_reg_by_valuename.update(map)
 
 class BMSError(Exception): pass
 
@@ -816,9 +741,9 @@ class JBD:
 
     def __init__(self, s, timeout = 3, debug = False):
         self.s = s
-        s.timeout=0.5
         try:
             self.s.close()
+            s.timeout=0.5
         except: 
             pass
         self._open_cnt = 0
@@ -826,6 +751,85 @@ class JBD:
         self.timeout = timeout
         self.debug = debug
 
+        self.eeprom_regs = [
+            ### EEPROM settings
+            ## Settings
+            # Basic Parameters
+            IntReg('covp', 0x24, Unit.MV, 1),
+            IntReg('covp_rel', 0x25, Unit.MV, 1),
+            IntReg('cuvp', 0x26, Unit.MV, 1),
+            IntReg('cuvp_rel', 0x27, Unit.MV, 1),
+            IntReg('povp', 0x20, Unit.MV, 10),
+            IntReg('povp_rel', 0x21, Unit.MV, 10),
+            IntReg('puvp', 0x22, Unit.MV, 10),
+            IntReg('puvp_rel', 0x23, Unit.MV, 10),
+            TempReg('chgot', 0x18),
+            TempReg('chgot_rel', 0x19),
+            TempReg('chgut', 0x1a),
+            TempReg('chgut_rel', 0x1b),
+            TempReg('dsgot', 0x1c),
+            TempReg('dsgot_rel', 0x1d),
+            TempReg('dsgut', 0x1e),
+            TempReg('dsgut_rel', 0x1f),
+            IntReg('chgoc', 0x28, Unit.MA, 10),
+            IntReg('dsgoc', 0x29, Unit.MA, 10),
+            DelayReg('cell_v_delays', 0x3d, 'cuvp_delay', 'covp_delay'),
+            DelayReg('pack_v_delays', 0x3c, 'puvp_delay', 'povp_delay'),
+            DelayReg('chg_t_delays', 0x3a, 'chgut_delay', 'chgot_delay'),
+            DelayReg('dsg_t_delays', 0x3b, 'dsgut_delay', 'dsgot_delay'),
+            DelayReg('chgoc_delays', 0x3e, 'chgoc_delay', 'chgoc_rel'),
+            DelayReg('dsgoc_delays', 0x3f, 'dsgoc_delay', 'dsgoc_rel'),
+
+            # High Protection Configuration
+            IntReg('covp_high', 0x36, Unit.MV, 1),
+            IntReg('cuvp_high', 0x37, Unit.MV, 1),
+            ScDsgoc2Reg('sc_dsgoc2', 0x38),
+            CxvpHighDelayScRelReg('cxvp_high_delay_sc_rel', 0x39),
+
+            # Function Configuration
+            BitfieldReg('func_config', 0x2d, 'switch', 'scrl', 'balance_en', 'chg_balance_en', 'led_en', 'led_num'),
+
+            # NTC Configuration
+            BitfieldReg('ntc_config', 0x2e, *(f'ntc{i+1}' for i in range(8))),
+
+            # Balance Configuration
+            IntReg('bal_start', 0x2a, Unit.MV, 1),
+            IntReg('bal_window', 0x2b, Unit.MV, 1),
+
+            # Other Configuration
+            IntReg('shunt_res', 0x2c, Unit.MO, .1),
+            IntReg('cell_cnt', 0x2f, int, 1),
+            IntReg('cycle_cnt', 0x17, int, 1),
+            IntReg('serial_num', 0x16, int, 1),
+            StringReg('mfg_name', 0xa0),
+            StringReg('device_name', 0xa1),
+            StringReg('barcode', 0xa2),
+            DateReg('mfg_date', 0x15),
+
+            # Capacity Config
+            IntReg('design_cap', 0x10, Unit.MAH, 10), 
+            IntReg('cycle_cap', 0x11, Unit.MAH, 10),
+            IntReg('dsg_rate', 0x14, Unit.PCT, .1), # presuming this means rate of self-discharge
+            IntReg('cap_100', 0x12, Unit.MV, 1), # AKA "Full Chg Vol"
+            IntReg('cap_80', 0x32, Unit.MV, 1),
+            IntReg('cap_60', 0x33, Unit.MV, 1),
+            IntReg('cap_40', 0x34, Unit.MV, 1),
+            IntReg('cap_20', 0x35, Unit.MV, 1),
+            IntReg('cap_0', 0x13, Unit.MV, 1), # AKA "End of Dsg VOL"
+            IntReg('fet_ctrl', 0x30, Unit.S, 1),
+            IntReg('led_timer', 0x31, Unit.S, 1),
+
+            # Errors
+            ErrorCountReg('error_cnts', 0xaa),
+        ]
+        self.eeprom_reg_by_valuename = {}
+        for reg in self.eeprom_regs:
+            map = {k:reg for k in reg.valueNames}
+            self.eeprom_reg_by_valuename.update(map)
+
+        self.basicInfoReg = BasicInfoReg('basic_info', 0x03)
+        self.cellInfoReg = CellInfoReg('cell_info', 0x04)
+        self.deviceInfoReg = DeviceInfoReg('device_info', 0x05)
 
     @staticmethod
     def toHex(data):
@@ -938,10 +942,10 @@ class JBD:
             self.open()
             self.enterFactory()
             ret = {}
-            numRegs = len(eeprom_regs)
+            numRegs = len(self.eeprom_regs)
             if progressFunc: progressFunc(0)
 
-            for i, reg in enumerate(eeprom_regs):
+            for i, reg in enumerate(self.eeprom_regs):
                 cmd = self.readCmd(reg.adx)
                 self.s.write(cmd)
                 ok, payload = self.readPacket()
@@ -960,23 +964,24 @@ class JBD:
             self.open()
             self.enterFactory()
             ret = {}
-            numRegs = len(eeprom_regs)
+            numRegs = len(self.eeprom_regs)
             if progressFunc: progressFunc(0)
             regs = set()
 
             for valueName, value in data.items():
-                reg = eeprom_reg_by_valuename.get(valueName)
+                reg = self.eeprom_reg_by_valuename.get(valueName)
                 if not reg: raise RuntimeError(f'unknown valueName {valueName}')
-                regs.add(reg)
                 try:
                     reg.set(valueName, value)
+                    regs.add(reg)
                 except ReadOnlyException:
                     print(f'skipping read-only valueName {valueName}')
 
-            toWrite = set('ntc1 led_en covp covp_rel covp_delay'.split())
+            toWrite = set('ntc1 led_en covp covp_rel covp_delay design_cap cycle_cap cap_100 cap_80 cap_60 cap_40 cap_20 cap_0'.split())
             
             for i,reg in enumerate(regs):
-                if toWrite & set(reg.valueNames):
+                if toWrite & set(reg.valueNames) or 1:
+                    print('reg', reg.regName)
                     data = reg.pack()
                     cmd = self.writeCmd(reg.adx, data)
                     self.s.write(cmd)
@@ -985,36 +990,23 @@ class JBD:
                     if payload is None: raise TimeoutError()
                     hexDump(cmd)
                 if progressFunc: progressFunc(int(i / (numRegs-1) * 100))
-
-
-
-            
-            if 0:
-                for i, reg in enumerate(eeprom_regs):
-                    cmd = self.readCmd(reg.adx)
-                    self.s.write(cmd)
-                    ok, payload = self.readPacket()
-                    if not ok: raise BMSError()
-                    if payload is None: raise TimeoutError()
-                    if progressFunc: progressFunc(int(i / (numRegs-1) * 100))
-                    reg.unpack(payload)
-                    ret.update(dict(reg))
-                self.exitFactory()
-                return ret
         finally:
             self.close()
+
+    def loadEepromFile(self, f):
+        pass
 
     def readBasicInfo(self):
         try:
             self.open()
             self.exitFactory()
-            cmd = self.readCmd(basicInfoReg.adx)
+            cmd = self.readCmd(self.basicInfoReg.adx)
             self.s.write(cmd)
             ok, payload = self.readPacket()
             if not ok: raise BMSError()
             if payload is None: raise TimeoutError()
-            basicInfoReg.unpack(payload)
-            return dict(basicInfoReg)
+            self.basicInfoReg.unpack(payload)
+            return dict(self.basicInfoReg)
         finally:
             self.close()
 
@@ -1051,12 +1043,13 @@ class JBD:
         self.exitFactory(True)
 
 def checkRegNames():
+    jbd = JBD(None)
     errors = []
     valueNamesToRegs = {}
     regNameCounts = {}
     # These have duplicate fields, but we don't care.
     ignore=BasicInfoReg,
-    for reg in eeprom_regs:
+    for reg in jbd.eeprom_regs:
         if reg.__class__ in ignore: continue
         if reg.regName not in regNameCounts:
             regNameCounts[reg.regName] = 1
@@ -1067,7 +1060,7 @@ def checkRegNames():
         if count == 1: continue
         errors.append(f'register name {regName} occurs {count} times')
 
-    for reg in eeprom_regs:
+    for reg in jbd.eeprom_regs:
         if reg.__class__ in ignore: continue
         valueNames = reg.valueNames
         for n in valueNames:
