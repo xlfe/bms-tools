@@ -1247,6 +1247,9 @@ class Main(wx.Frame):
         else:
             print(f'unknown button {n}')
 
+    def loadEeprom(self):
+        self.j.loadEepromFile('factory.fig')
+
     def clearErrors(self):
         try:
             self.j.clearErrors()
