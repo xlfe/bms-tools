@@ -33,6 +33,69 @@ defaultBorder = wx.EXPAND | wx.TOP | wx.BOTTOM | wx.LEFT | wx.RIGHT, 7
 colGap = (10,1)
 boxGap = (3,3)
 
+cellRange   = (0, 65536, 100)
+packRange   = (0, 655350, 100)
+tempRange   = (-273.15, 6316.4, 1)
+mahRange     = (0, 655350, 1000)
+chgRange    = (0, 327670, 100)
+dsgRange    = (-327680, 0, 100)
+delayRange  = (0, 255, 1)
+ranges = {
+    'covp':         cellRange,
+    'covp_rel':     cellRange,
+    'covp_delay':   delayRange,
+    'cuvp':         cellRange,
+    'cuvp_rel':     cellRange,
+    'cuvp_delay':   delayRange,
+    'povp':         packRange,
+    'povp_rel':     packRange,
+    'povp_delay':   delayRange,
+    'puvp':         packRange,
+    'puvp_rel':     packRange,
+    'chgot':        tempRange,
+    'chgot_rel':    tempRange,
+    'chgot_delay':  delayRange,
+    'chgut':        tempRange,
+    'chgut_rel':    tempRange,
+    'chgut_delay':  delayRange,
+    'dsgot':        tempRange,
+    'dsgot_rel':    tempRange,
+    'dsgot_delay':  delayRange,
+    'dsgut':        tempRange,
+    'dsgut_rel':    tempRange,
+    'dsgut_delay':  delayRange,
+
+    'chgoc':        chgRange,
+    'chgoc_rel':    delayRange,
+    'chgoc_delay':  delayRange,
+    'dsgoc':        dsgRange,
+    'dsgoc_rel':    delayRange,
+    'dsgoc_delay':  delayRange,
+
+    'covp_high':    cellRange,
+    'cuvp_high':    cellRange,
+
+    'bal_start':    cellRange,
+    'bal_window':   cellRange,
+
+    'design_cap':   mahRange,
+    'cycle_cap':    mahRange,
+    'dsg_rate':     (0.0, 100.0, .1),
+    'fet_ctrl':     (0, 65535, 1),
+    'led_timer':    (0, 65535, 1),
+
+    'cap_100':      cellRange,
+    'cap_80':       cellRange,
+    'cap_60':       cellRange,
+    'cap_40':       cellRange,
+    'cap_20':       cellRange,
+    'cap_0':        cellRange,
+
+
+    'cycle_cnt':    (0, 65535, 1),
+    'shunt_res':    (0.0, 6553.5, .1),
+}
+
 class BetterChoice(wx.Choice):
     def __init__(self, parent, **kwargs):
         choices = kwargs.get('choices')
@@ -437,20 +500,23 @@ class LayoutGen:
         panel.SetSizer(sbs)
         sizer.Add(panel, 0, *defaultBorder)
 
-        def gen(fn, unit1, unit2 = None, unit3 = 'S', spacing=10):
+        def gen(fn, unit1, unit2 = None, unit3 = 'S', spacing=10, digits = 0):
             unit2 = unit2 or unit1
+            c1 = wx.SpinCtrlDouble(sb, name = fn,  size = self.txtSize10)
+            c2 = wx.SpinCtrlDouble(sb, name = fn + '_rel', size=self.txtSize10)
+            c1.SetDigits(digits)
+            c2.SetDigits(digits)
             items = [
                 (wx.StaticText(sb, label = fn.upper()), 0, rflags),
-                #(wx.lib.masked.numctrl.NumCtrl(sb, name = fn, size = self.txtSize6), 0, lflags),
-                (wx.lib.masked.numctrl.NumCtrl(sb, name = fn, integerWidth=6), 0, lflags),
+                (c1, 0, lflags),
                 (wx.StaticText(sb, label = unit1), 0, lflags),
                 colGap,
                 (wx.StaticText(sb, label = 'Rel'), 0, rflags),
-                (wx.TextCtrl(sb, name = fn + '_rel', size=self.txtSize6), 0, lflags),
+                (c2, 0, lflags),
                 (wx.StaticText(sb, label = unit2), 0, lflags),
                 colGap,
                 (wx.StaticText(sb, label = 'Delay'), 0, rflags),
-                (wx.TextCtrl(sb, name = fn + '_delay', size=self.txtSize3), 0, lflags),
+                (wx.SpinCtrlDouble(sb, name = fn + '_delay', size=self.txtSize6), 0, lflags),
                 (wx.StaticText(sb, label = unit3), 0, lflags),
             ]
             return items
@@ -459,10 +525,10 @@ class LayoutGen:
         fgs.AddMany(gen('cuvp', 'mV'))
         fgs.AddMany(gen('povp', 'mV'))
         fgs.AddMany(gen('puvp', 'mV'))
-        fgs.AddMany(gen('chgot', 'C'))
-        fgs.AddMany(gen('chgut', 'C'))
-        fgs.AddMany(gen('dsgot', 'C'))
-        fgs.AddMany(gen('dsgut', 'C'))
+        fgs.AddMany(gen('chgot', 'C', digits = 1))
+        fgs.AddMany(gen('chgut', 'C', digits = 1))
+        fgs.AddMany(gen('dsgot', 'C', digits = 1))
+        fgs.AddMany(gen('dsgut', 'C', digits = 1))
         fgs.AddMany(gen('chgoc', 'mA', 'S'))
         fgs.AddMany(gen('dsgoc', 'mA', 'S'))
 
@@ -522,7 +588,7 @@ class LayoutGen:
         s1 = wx.BoxSizer()
         s2 = wx.BoxSizer()
         s1.AddMany([
-                (wx.TextCtrl(sb, name = 'covp_high'), 0, a),
+                (wx.SpinCtrlDouble(sb, name = 'covp_high'), 0, a),
                 (wx.StaticText(sb, label = 'mV'), 0, a),
         ])
         s2.AddMany([
@@ -540,7 +606,7 @@ class LayoutGen:
         s1 = wx.BoxSizer()
         s2 = wx.BoxSizer()
         s1.AddMany([
-                (wx.TextCtrl(sb, name = 'cuvp_high'), 0, a),
+                (wx.SpinCtrlDouble(sb, name = 'cuvp_high'), 0, a),
                 (wx.StaticText(sb, label = 'mV'), 0, a),
         ])
         s2.AddMany([
@@ -609,11 +675,11 @@ class LayoutGen:
 
         fgs.AddMany([
             (wx.StaticText(sb, label='Start Voltage'), 0, rflags),
-            (wx.TextCtrl(sb, name='bal_start'), 0, lflags),
+            (wx.SpinCtrlDouble(sb, name='bal_start'), 0, lflags),
             (wx.StaticText(sb, label='mV'), 0, lflags),
 
             (wx.StaticText(sb, label='Balance Window'), 0, rflags),
-            (wx.TextCtrl(sb, name='bal_window'), 0, lflags),
+            (wx.SpinCtrlDouble(sb, name='bal_window'), 0, lflags),
             (wx.StaticText(sb, label='mV'), 0, lflags),
         ])
 
@@ -631,8 +697,11 @@ class LayoutGen:
         s1 = wx.BoxSizer()
         s2 = wx.BoxSizer()
 
+        sr = wx.SpinCtrlDouble(sb, name='shunt_res', size=self.txtSize8)
+        sr.SetDigits(1)
+        sr.SetIncrement(0.1)
         s1.AddMany([
-            (wx.TextCtrl(sb, name='shunt_res', size=self.txtSize6), 0, a),
+            (sr, 0, a),
             (wx.StaticText(sb, label = 'mΩ'), 0, a),
         ])
         s2.AddMany([ 
@@ -648,7 +717,7 @@ class LayoutGen:
         s2 = wx.BoxSizer()
 
         s1.AddMany([
-            (wx.TextCtrl(sb, name='cycle_cnt', size=self.txtSize4), 0, a),
+            (wx.SpinCtrlDouble(sb, name='cycle_cnt', size=self.txtSize8), 0, a),
         ])
         s2.AddMany([ 
             (wx.TextCtrl(sb, name='serial_num', size=self.txtSize6), 0, a),
@@ -722,10 +791,13 @@ class LayoutGen:
         panel.SetSizer(sbs)
         sizer.Add(panel, 1, *defaultBorder)
 
-        def gen(label, fn, unit):
+        def gen(label, fn, unit, digits = 0):
+            c = wx.SpinCtrlDouble(sb, name = fn, size = self.txtSize10)
+            c.SetDigits(digits)
+            c.SetIncrement(10 ** -digits)
             items = [
                 (wx.StaticText(sb, label = label), 0, rflags),
-                (wx.TextCtrl(sb, name = fn, size = self.txtSize6), 0, lflags),
+                (c, 0, lflags),
                 (wx.StaticText(sb, label = unit), 0, lflags),
             ]
             return items
@@ -738,7 +810,7 @@ class LayoutGen:
         fgs.AddMany(gen('Cell 40%', 'cap_40', 'mV'))
         fgs.AddMany(gen('Cell 20%', 'cap_20', 'mV'))
         fgs.AddMany(gen('Cell 0%', 'cap_0', 'mV'))
-        fgs.AddMany(gen('Dsg Rate', 'dsg_rate', '%'))
+        fgs.AddMany(gen('Dsg Rate', 'dsg_rate', '%', 1))
         fgs.AddMany(gen('FET ctrl', 'fet_ctrl', 'S'))
         fgs.AddMany(gen('LED timer', 'led_timer', 'S'))
 
@@ -909,6 +981,8 @@ class ChildIter:
         'staticText', 
         'panel', 
         'GridWindow', 
+        'text', 
+        'wxSpinButton',
         'groupBox', 
         'scrolledpanel',
         }
@@ -941,8 +1015,8 @@ class Main(wx.Frame):
         kwargs['style'] = wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX)
         wx.Frame.__init__(self, *args, **kwargs)
 
-        #self.j = jbd.JBD(serial.Serial('COM4'))
-        self.j = jbd.JBD(serial.Serial('/dev/ttyUSB0'))
+        self.j = jbd.JBD(serial.Serial('COM4'))
+        #self.j = jbd.JBD(serial.Serial('/dev/ttyUSB0'))
 
         font = wx.Font(8, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         self.SetFont(font)
@@ -967,7 +1041,19 @@ class Main(wx.Frame):
 
         for c in ChildIter.iterNamed(self.infoTab):
             c.Name = 'info_' + c.Name
-            print(c.Name)
+
+        for name, r in ranges.items():
+            name = 'eeprom_'+name
+            w = self.FindWindowByName(name)
+            if not w:
+                print(f'unknown control {name}')
+                continue
+            try:
+                min, max, increment = r
+                w.SetRange(min, max)
+                w.SetIncrement(increment)
+            except Exception as e:
+                print(f'unable to call SetRange on {name}')
 
         nb_sizer = wx.BoxSizer()
         nb_sizer.Add(nb, 1, wx.EXPAND | wx.ALL, 5)
@@ -1013,7 +1099,7 @@ class Main(wx.Frame):
 
     def readEeprom(self):
         worker = EepromWorker(self, self.j)
-        worker.run(worker.ReadEeprom)
+        worker.run(worker.readEeprom)
 
     def writeEeprom(self):
         data = {}
@@ -1022,7 +1108,7 @@ class Main(wx.Frame):
             n = c.Name[7:]
             data[n] = self.get(c.Name)
         worker = EepromWorker(self, self.j)
-        worker.run(worker.WriteEeprom, data)
+        worker.run(worker.writeEeprom, data)
 
     def readInfo(self):
         basicInfo = self.j.readBasicInfo()
@@ -1112,7 +1198,9 @@ class Main(wx.Frame):
         if w is None:
             print(f'set: unknown field: {name}')
             return
-        if isinstance(w, wx.TextCtrl) or isinstance(w, RoundGauge):
+        if (isinstance(w, wx.TextCtrl) or 
+            isinstance(w, RoundGauge) or 
+            isinstance(w, wx.SpinCtrlDouble)):
             w.SetValue(svalue)
         elif isinstance(w, wx.StaticText):
             w.SetLabel(svalue)
@@ -1130,13 +1218,14 @@ class Main(wx.Frame):
             return
         if (isinstance(w, EnumChoice) or 
             isinstance(w, wx.TextCtrl) or 
+            isinstance(w, wx.SpinCtrlDouble) or 
             isinstance(w, wx.CheckBox) or
             isinstance(w, BetterChoice)):
             return w.GetValue()
         elif isinstance(w, wx.StaticText):
             return None
         else:
-            print(f'get: unknown control type {type(w)}')
+            print(f'get: unknown control type {type(w)}, name: {w.Name}')
 
     def onButtonClick(self, evt):
         n = evt.EventObject.Name
@@ -1185,7 +1274,7 @@ class EepromWorker:
     def progress(self, value):
         wx.PostEvent(self.parent, self.EepProg(value = value))
 
-    def ReadEeprom(self):
+    def readEeprom(self):
         try:
             data = self.j.readEeprom(self.progress)
             wx.PostEvent(self.parent, self.EepDone(data = data))
@@ -1194,7 +1283,7 @@ class EepromWorker:
         finally:
             wx.PostEvent(self.parent, self.EepProg(value = 100))
 
-    def WriteEeprom(self, data):
+    def writeEeprom(self, data):
         try:
             self.j.writeEeprom(data, self.progress)
             wx.PostEvent(self.parent, self.EepDone(data = None))
