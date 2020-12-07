@@ -422,7 +422,10 @@ class DateReg(BaseReg):
 
     @staticmethod
     def unpackDate(payload):
-        value = struct.unpack('>H', payload)[0]
+        if type(payload) in (bytes, bytearray):
+            value = struct.unpack('>H', payload)[0]
+        else:
+            value = int(payload)
         day = value & 0x1f
         value >>= 5
         month = value & 0xf
@@ -659,77 +662,115 @@ class DeviceInfoReg(BaseReg):
         
 
 class JBDPersist:
-    pass
 
-    
-#savefile_fields =  [
-#    #'FileCode' __unknown__ 3838
-#    ('DesignCapacity', ('design_ca,) int)           # reg
-#    ('CycleCapacity', ('cycle_ca,) int)             # reg
-#    ('FullChargeVol', ('cap_10,) int)               # reg
-#    ('ChargeEndVol', ('cap_,) int)                  # reg
-#    ('DischargingRate', ('dsg_rat,) int)            # reg
-#    ('ManufactureDate', ('mfg_dat,) int)            # reg
-#    ('SerialNumber', ('serial_nu,) int)             # reg
-#    ('CycleCount', ('cycle_cn,) int)                # reg
-#    ('ChgOverTemp', ('chgo,) int)                   # reg
-#    ('ChgOTRelease', ('chgot_re,) int)              # reg
-#    ('ChgLowTemp', ('chgu,) int)                    # reg
-#    ('ChgUTRelease', ('chgut_re,) int)              # reg
-#    ('DisOverTemp', ('dsgo,) int)                   # reg
-#    ('DsgOTRelease', ('dsgot_re,) int)              # reg
-#    ('DisLowTemp', ('dsgut') ,                   # reg
-#    ('DsgUTRelease', ('dsgut_re,) int)              # reg
-#    ('PackOverVoltage', ('pov,) int)                # reg
-#    ('PackOVRelease', ('povp_re,) int)              # reg
-#    ('PackUnderVoltage', ('puv,) int)               # reg
-#    ('PackUVRelease', ('puvp_re,) int)              # reg
-#    ('CellOverVoltage', ('cov,) int)                # reg
-#    ('CellOVRelease', ('covp_re,) int)              # reg
-#    ('CellUnderVoltage', ('cuv,) int)               # reg
-#    ('CellUVRelease', ('cuvp_re,) int)              # reg
-#    ('OverChargeCurrent', ('chgo,) int)             # reg
-#    ('OverDisCurrent', ('dsgo,) int)                # reg
-#    ('BalanceStartVoltage', ('bal_star,) int)       # reg
-#    ('BalanceWindow', ('bal_windo,) int)            # reg
-#    ('SenseResistor', ('current_re,) int)           # reg
-#    ('BatteryConfig', ('func_confi,) int)           # reg
-#    ('NtcConfig', ('ntc_confi,) int)                # reg
-#    ('PackNum', ('cell_cn,) int)                    # reg
-#    ('fet_ctrl_time_set', ('fet_ctr,) int)          # reg
-#    ('led_disp_time_set', ('led_time,) int)         # reg
-#    ('VoltageCap80', ('cap_8,) int)                 # reg
-#    ('VoltageCap60', ('cap_6,) int)                 # reg
-#    ('VoltageCap40', ('cap_4,) int)                 # reg
-#    ('VoltageCap20', ('cap_2,) int)                 # reg
-#    ('HardCellOverVoltage', ('covp_hig,) int)       # reg
-#    ('HardCellUnderVoltage', ('cuvp_hig,) int)      # reg
-#
-#    ('HardChgOverCurrent', ( 'sc,: ('sc_dela,': ('sc_dsgoc2)', int)
-#    ('HardDsgOverCurrent', ('dsgoc2,: ('dsgoc2_del'), int)
-#
-#    ('HardTime', ('covp_high_delay,: ('cuvp_high_del'), int)
-#    ('SCReleaseTime', ('sc_re,) int)
-#
-#
-#    ('ChgUTDelay', ('chgut_dela,) int)              # field
-#    ('ChgOTDelay', ('chgot_dela,) int)              # field
-#    ('DsgUTDelay', ('dsgut_dela,) int)              # field
-#    ('DsgOTDelay', ('dsgot_dela,) int)              # field
-#    ('PackUVDelay', ('puvp_dela,) int)              # field
-#    ('PackOVDelay', ('povp_dela,) int)              # field
-#    ('CellUVDelay', ('cuvp_dela,) int)              # field
-#    ('CellOVDelay', ('covp_dela,) int)              # field
-#    ('ChgOCDelay', ('chgoc_dela,) int)              # field
-#    ('ChgOCRDelay', ('chgoc_re,) int)               # field
-#    ('DsgOCDelay', ('dsgoc_dela,) int)              # field
-#    ('DsgOCRDelay', ('dsgoc_re,) int)               # field
-#
-#    ('ManufacturerName', ('mfg_nam,) int)           # reg
-#    ('DeviceName', ('device_nam,) int)              # reg
-#    ('BarCode', ('barcod,) int)                     # reg
-#]
+    simpleInt = lambda x: (int(x),)
+    simpleStr = lambda x: (str(x),)
 
+    xxx = simpleInt
+    yyy = simpleInt
+    zzz = simpleInt
+
+    fields =  {
+        #'FileCode' __unknown__ 3838
+        'DesignCapacity':       (('design_cap',), simpleInt),        # reg
+        'CycleCapacity':        (('cycle_cap',), simpleInt),         # reg
+        'FullChargeVol':        (('cap_100',), simpleInt),           # reg
+        'ChargeEndVol':         (('cap_0',), simpleInt),             # reg
+        'DischargingRate':      (('dsg_rate',), simpleInt),          # reg
+        'ManufactureDate':      (('year', 'month', 'day'), DateReg.unpackDate),          # reg
+        'SerialNumber':         (('serial_num',), simpleInt),        # reg
+        'CycleCount':           (('cycle_cnt',), simpleInt),         # reg
+        'ChgOverTemp':          (('chgot',), simpleInt),             # reg
+        'ChgOTRelease':         (('chgot_rel',), simpleInt),         # reg
+        'ChgLowTemp':           (('chgut',), simpleInt),             # reg
+        'ChgUTRelease':         (('chgut_rel',), simpleInt),         # reg
+        'DisOverTemp':          (('dsgot',), simpleInt),             # reg
+        'DsgOTRelease':         (('dsgot_rel',), simpleInt),         # reg
+        'DisLowTemp':           (('dsgut' ,), simpleInt),            # reg
+        'DsgUTRelease':         (('dsgut_rel',), simpleInt),         # reg
+        'PackOverVoltage':      (('povp',), simpleInt),              # reg
+        'PackOVRelease':        (('povp_rel',), simpleInt),          # reg
+        'PackUnderVoltage':     (('puvp',), simpleInt),              # reg
+        'PackUVRelease':        (('puvp_rel',), simpleInt),          # reg
+        'CellOverVoltage':      (('covp',), simpleInt),              # reg
+        'CellOVRelease':        (('covp_rel',), simpleInt),          # reg
+        'CellUnderVoltage':     (('cuvp',), simpleInt),              # reg
+        'CellUVRelease':        (('cuvp_rel',), simpleInt),          # reg
+        'OverChargeCurrent':    (('chgoc',), simpleInt),             # reg
+        'OverDisCurrent':       (('dsgoc',), simpleInt),             # reg
+        'BalanceStartVoltage':  (('bal_start',), simpleInt),         # reg
+        'BalanceWindow':        (('bal_window',), simpleInt),        # reg
+        'SenseResistor':        (('current_res',), simpleInt),       # reg
+        'BatteryConfig':        (('func_config',), simpleInt),       # reg
+        'NtcConfig':            (('ntc_config',), simpleInt),        # reg
+        'PackNum':              (('cell_cnt',), simpleInt),          # reg
+        'fet_ctrl_time_set':    (('fet_ctrl',), simpleInt),          # reg
+        'led_disp_time_set':    (('led_timer',), simpleInt),         # reg
+        'VoltageCap80':         (('cap_80',), simpleInt),            # reg
+        'VoltageCap60':         (('cap_60',), simpleInt),            # reg
+        'VoltageCap40':         (('cap_40',), simpleInt),            # reg
+        'VoltageCap20':         (('cap_20',), simpleInt),            # reg
+        'HardCellOverVoltage':  (('covp_high',), simpleInt),         # reg
+        'HardCellUnderVoltage': (('cuvp_high',), simpleInt),         # reg
+
+
+        'ChgUTDelay':           (('chgut_delay',), simpleInt),       # field
+        'ChgOTDelay':           (('chgot_delay',), simpleInt),       # field
+        'DsgUTDelay':           (('dsgut_delay',), simpleInt),       # field
+        'DsgOTDelay':           (('dsgot_delay',), simpleInt),       # field
+        'PackUVDelay':          (('puvp_delay',), simpleInt),        # field
+        'PackOVDelay':          (('povp_delay',), simpleInt),        # field
+        'CellUVDelay':          (('cuvp_delay',), simpleInt),        # field
+        'CellOVDelay':          (('covp_delay',), simpleInt),        # field
+        'ChgOCDelay':           (('chgoc_delay',), simpleInt),       # field
+        'ChgOCRDelay':          (('chgoc_rel',), simpleInt),         # field
+        'DsgOCDelay':           (('dsgoc_delay',), simpleInt),       # field
+        'DsgOCRDelay':          (('dsgoc_rel',), simpleInt),         # field
+
+        'ManufacturerName':     (('mfg_name',), simpleStr),          # reg
+        'DeviceName':           (('device_name',), simpleStr),       # reg
+        'BarCode':              (('barcode',), simpleStr),           # reg
+        'HardChgOverCurrent':   (('sc', 'sc_delay', 'sc_dsgoc_x2'), xxx),
+        'HardDsgOverCurrent':   (('dsgoc2', 'dsgoc2_delay'), yyy),
+
+        'HardTime':             (('covp_high_delay', 'cuvp_high_delay'), zzz),
+        'SCReleaseTime':        (('sc_rel',), simpleInt),
+    }
+
+    def __init__(self, eeprom_reg_by_valuename):
+        self.eeprom_reg_by_valuename = eeprom_reg_by_valuename
+
+    def load(self, f):
+        opened = False
+        try:
+            if type(f) in (bytes, bytearray, str): 
+                f = open(f)
+                opened = True
+            lines = [l.strip() for l in f.readlines() if l.strip()]
+            kv = [l.split(maxsplit=1) for l in lines]
+            kv = [(i + [''])[:2] for i in kv]
+            for fieldName, data in kv:
+                if fieldName not in self.fields:
+                    print(f'unknown field {fieldName}')
+                    continue
+                valueNames, conv = self.fields[fieldName]
+                values = conv(data)
+                print (fieldName, repr(data))
+                print (dict(zip(valueNames, values)))
+
+        finally:
+            if opened: f.close()
+
+
+
+    def save(self, f):
+        opened = False
+        try:
+            if type(f) in (bytes, bytearray, str): 
+                f = open(f)
+                opened = True
+        finally:
+            if opened: f.close()
 
 class BMSError(Exception): pass
 
@@ -994,7 +1035,14 @@ class JBD:
             self.close()
 
     def loadEepromFile(self, f):
-        pass
+        p = JBDPersist(self.eeprom_reg_by_valuename)
+        p.load(f)
+
+    def saveEepromFile(self, f):
+        p = JBDPersist(self.eeprom_reg_by_valuename)
+        p.save(f)
+
+
 
     def readBasicInfo(self):
         try:
