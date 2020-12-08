@@ -502,8 +502,10 @@ class LayoutGen:
 
         def gen(fn, unit1, unit2 = None, unit3 = 'S', spacing=10, digits = 0):
             unit2 = unit2 or unit1
-            c1 = wx.SpinCtrlDouble(sb, name = fn,  size = self.txtSize10)
-            c2 = wx.SpinCtrlDouble(sb, name = fn + '_rel', size=self.txtSize10)
+            #c1 = wx.SpinCtrlDouble(sb, name = fn,  size = self.txtSize10)
+            #c2 = wx.SpinCtrlDouble(sb, name = fn + '_rel', size=self.txtSize10)
+            c1 = wx.SpinCtrlDouble(sb, name = fn)
+            c2 = wx.SpinCtrlDouble(sb, name = fn + '_rel')
             c1.SetDigits(digits)
             c2.SetDigits(digits)
             items = [
@@ -516,7 +518,7 @@ class LayoutGen:
                 (wx.StaticText(sb, label = unit2), 0, lflags),
                 colGap,
                 (wx.StaticText(sb, label = 'Delay'), 0, rflags),
-                (wx.SpinCtrlDouble(sb, name = fn + '_delay', size=self.txtSize6), 0, lflags),
+                (wx.SpinCtrlDouble(sb, name = fn + '_delay'), 0, lflags),
                 (wx.StaticText(sb, label = unit3), 0, lflags),
             ]
             return items
@@ -697,7 +699,7 @@ class LayoutGen:
         s1 = wx.BoxSizer()
         s2 = wx.BoxSizer()
 
-        sr = wx.SpinCtrlDouble(sb, name='shunt_res', size=self.txtSize8)
+        sr = wx.SpinCtrlDouble(sb, name='shunt_res')
         sr.SetDigits(1)
         sr.SetIncrement(0.1)
         s1.AddMany([
@@ -717,7 +719,7 @@ class LayoutGen:
         s2 = wx.BoxSizer()
 
         s1.AddMany([
-            (wx.SpinCtrlDouble(sb, name='cycle_cnt', size=self.txtSize8), 0, a),
+            (wx.SpinCtrlDouble(sb, name='cycle_cnt'), 0, a),
         ])
         s2.AddMany([ 
             (wx.TextCtrl(sb, name='serial_num', size=self.txtSize6), 0, a),
@@ -792,7 +794,7 @@ class LayoutGen:
         sizer.Add(panel, 1, *defaultBorder)
 
         def gen(label, fn, unit, digits = 0):
-            c = wx.SpinCtrlDouble(sb, name = fn, size = self.txtSize10)
+            c = wx.SpinCtrlDouble(sb, name = fn)
             c.SetDigits(digits)
             c.SetIncrement(10 ** -digits)
             items = [
@@ -1015,8 +1017,8 @@ class Main(wx.Frame):
         kwargs['style'] = wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX)
         wx.Frame.__init__(self, *args, **kwargs)
 
-        self.j = jbd.JBD(serial.Serial('COM4'))
-        #self.j = jbd.JBD(serial.Serial('/dev/ttyUSB0'))
+        #self.j = jbd.JBD(serial.Serial('COM4'))
+        self.j = jbd.JBD(serial.Serial('/dev/ttyUSB0'))
 
         font = wx.Font(8, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         self.SetFont(font)
@@ -1097,18 +1099,6 @@ class Main(wx.Frame):
 
         self.setupClockTimer()
 
-    def readEeprom(self):
-        worker = EepromWorker(self, self.j)
-        worker.run(worker.readEeprom)
-
-    def writeEeprom(self):
-        data = {}
-        for c in ChildIter.iterNamed(self):
-            if not c.Name.startswith('eeprom_'): continue
-            n = c.Name[7:]
-            data[n] = self.get(c.Name)
-        worker = EepromWorker(self, self.j)
-        worker.run(worker.writeEeprom, data)
 
     def readInfo(self):
         basicInfo = self.j.readBasicInfo()
@@ -1174,13 +1164,23 @@ class Main(wx.Frame):
             traceback.print_tb(evt.data.__traceback__)
             print(f'eeprom error: {repr(evt.data)}')
         elif evt.data is not None:
-            pprint(evt.data)
-            for k,v in evt.data.items():
-                self.set('eeprom_'+k,v)
-            self.FindWindowByName('write_eeprom_btn').Enable(True)
-            self.FindWindowByName('save_eeprom_btn').Enable(True)
+            self.populateEeprom(evt.data)
         else:
             pass # was eeprom write ...
+
+    def scatterEeprom(self, data): # AKA "populate GUI fields"
+        for k,v in data.items():
+            self.set('eeprom_'+k,v)
+        self.FindWindowByName('write_eeprom_btn').Enable(True)
+        self.FindWindowByName('save_eeprom_btn').Enable(True)
+
+    def gatherEeprom(self): # AKA "get data from GUI fields"
+        data = {}
+        for c in ChildIter.iterNamed(self):
+            if not c.Name.startswith('eeprom_'): continue
+            n = c.Name[7:]
+            data[n] = self.get(c.Name)
+        return data
 
     def setupClockTimer(self):
         self.clockTimer = wx.Timer(self)
@@ -1247,8 +1247,18 @@ class Main(wx.Frame):
         else:
             print(f'unknown button {n}')
 
+    def readEeprom(self):
+        worker = EepromWorker(self, self.j)
+        worker.run(worker.readEeprom)
+
+    def writeEeprom(self):
+        data = self.gatherEeprom()
+        worker = EepromWorker(self, self.j)
+        worker.run(worker.writeEeprom, data)
+
     def loadEeprom(self):
-        self.j.loadEepromFile('factory.fig')
+        data = self.j.loadEepromFile('factory.fig')
+        self.scatterEeprom(data)
 
     def clearErrors(self):
         try:
