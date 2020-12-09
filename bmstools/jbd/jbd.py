@@ -278,13 +278,16 @@ class JBD:
         finally:
             self.close()
 
-    def loadEepromFile(self, f):
+    def loadEepromFile(self, filename):
         p = persist.JBDPersist()
-        return p.load(f)
+        with open(filename) as f:
+            data = f.read()
+        return p.deserialize(data)
 
-    def saveEepromFile(self, f):
+    def saveEepromFile(self, filename, data):
         p = persist.JBDPersist()
-        p.save(f)
+        with open(filename, 'wb') as f:
+            f.write(p.serialize(data))
 
 
 

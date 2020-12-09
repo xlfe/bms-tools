@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from enum import Enum
+from .parsers import *
 
 class Unit(Enum):
     MV  = ('millivolt', 'mV')
@@ -167,7 +168,6 @@ class ReadOnlyMixin:
     def pack(self):
         raise ReadOnlyException(f'{self._regName} is read-only')
 
-
 class IntReg(BaseReg): 
     def __init__(self, regName, adx, unit, factor, range=(-32768, 32768)):
         self._regName = regName
@@ -233,20 +233,14 @@ class TempReg(IntReg):
         except:
             raise ValueError(f'value {repr(value)} is not valid for {self.__class__.__name__}')
         self._value = value
-
-    @staticmethod
-    def unpackTemp(payload):
-        return (struct.unpack('>H', payload)[0] - 2731) / 10
-
-    @staticmethod
-    def packTemp(value):
-        return struct.pack('>H', int(value) * 10 + 2731)
     
     def unpack(self, payload):
-        self._value = self.unpackTemp(payload)
+        value = struct.unpack('>H', payload)[0]
+        self._value = TempParser.decode(value)[0]
 
     def pack(self):
-        return self.packTemp(self._value)
+        value = TempParser.encode(self._value)
+        return struct.pack('>H', value)
 
 class TempRegRO(TempReg, ReadOnlyMixin): pass
 
@@ -334,15 +328,14 @@ class BitfieldReg(BaseReg):
         self._values[valueName] = bool(value)
 
     def unpack(self, payload):
-        value = struct.unpack('>H', payload)[0]
-        for i, valueName in enumerate(self._values.keys()):
-            self._values[valueName] = bool(value & (1 << i))
+        values = BitfieldParser.decode(struct.unpack('>H', payload)[0])
+        values = values[:len(self.valueNames)]
+
+        for k,v in zip(self._values.keys(), values):
+            self._values[k] = v
 
     def pack(self):
-        value = 0
-        for i, valueName in enumerate(self._values.keys()):
-            if self._values[valueName]:
-                value |= (1 << i)
+        value = BitfieldParser.encode(self._values.values())
         return struct.pack('>H', value)
 
 class StringReg(BaseReg):
@@ -409,33 +402,12 @@ class DateReg(BaseReg):
     def __str__(self):
         return f'{self.year}-{self.month}-{self.day}'
 
-    @staticmethod
-    def unpackDate(payload):
-        if type(payload) in (bytes, bytearray):
-            value = struct.unpack('>H', payload)[0]
-        else:
-            value = int(payload)
-        day = value & 0x1f
-        value >>= 5
-        month = value & 0xf
-        value >>= 4
-        year = (value & 0x7f) + 2000
-        return year, month, day
-
-    @staticmethod
-    def packDate(year, month, day):
-        value = (year - 2000) & 0x7f
-        value <<= 4
-        value |= month
-        value <<= 5
-        value |= day
-        return struct.pack('>H', value)
-
     def unpack(self, payload):
-        self._year, self._month, self._day = self.unpackDate(payload)
+        value = struct.unpack('>H', payload)[0]
+        self._year, self._month, self._day = DateParser.decode(payload)
     
     def pack(self):
-        return self.packDate(self._year, self._month, self._day)
+        return struct.pack('>H', DateParser.encode(self._year, self._month, self._day))
 
 class ScDsgoc2Reg(BaseReg):
     _valueNames = ('sc', 'sc_delay', 'dsgoc2', 'dsgoc2_delay', 'sc_dsgoc_x2')
@@ -478,25 +450,14 @@ class ScDsgoc2Reg(BaseReg):
     def unpack(self, payload):
         b1, b2 = struct.unpack('>BB', payload)
 
-        self._sc_dsgoc_x2 = bool(b1 & 0x80)
-
-        sc = b1 & 0x7
-        sc_delay = (b1 >> 3) & 0x3
-
-        self._sc = ScEnum.byValue(sc) or ScEnum._22MV
-        self._sc_delay = ScDelayEnum.byValue(sc_delay) or ScDelayEnum._70US
-
-        dsgoc2_delay = b2 >> 4
-        dsgoc2 = b2 & 0xf
-
-        self._dsgoc2 = Dsgoc2Enum.byValue(dsgoc2) or Dsgoc2Enum._8MV
-        self._dsgoc2_delay = Dsgoc2DelayEnum.byValue(dsgoc2_delay) or Dsgoc2DelayEnum._8MS
+        self._sc, self._sc_delay, self._sc_dsgoc_x2 = ScParser.decode(b1)
+        self._dsgoc2, self._dsgoc2_delay = Dsgoc2Parser.decode(b2)
 
     def pack(self):
-        x2 = 0x80 if self._sc_dsgoc_x2 else 0
-        b1 = self._sc.val | (self._sc_delay.val << 3) | x2
-        b2 = (self._dsgoc2_delay.val << 4) | self._dsgoc2.val
+        b1 = ScParser.encode(self._sc, self._sc_delay, self._sc_dsgoc_x2)
+        b2 = Dsgoc2Parser.encode(self._dsgoc2, self._dsgoc2_delay)
         return struct.pack('>BB', b1, b2)
+
 
 class CxvpHighDelayScRelReg(BaseReg):
     _valueNames = ('cuvp_high_delay', 'covp_high_delay', 'sc_rel')
@@ -532,15 +493,11 @@ class CxvpHighDelayScRelReg(BaseReg):
             raise KeyError(valueName)
 
     def unpack(self, payload):
-        b1, self._sc_rel = struct.unpack('>BB', payload)
-        cuvp_high_delay = b1 >> 6
-        covp_high_delay = (b1 >> 4) & 0x3
-        self._cuvp_high_delay = CuvpHighDelayEnum.byValue(cuvp_high_delay) or CuvpHighDelayEnum._1S
-        self._covp_high_delay = CovpHighDelayEnum.byValue(covp_high_delay) or CovpHighDelayEnum._1S
+        b1, self._sc_rel= struct.unpack('>BB', payload)
+        self._cuvp_high_delay, self._covp_high_delay = CxvpDelayParser.decode(b1)
     
     def pack(self):
-        b1 = (self._cuvp_high_delay.val) << 6
-        b1 |= (self._covp_high_delay.val) << 4
+        b1 = CxvpDelayParser.encode(self._cuvp_high_delay, self._covp_high_delay)
         return struct.pack('>BB', b1, self._sc_rel)
 
 class BasicInfoReg(BaseReg):
@@ -549,8 +506,8 @@ class BasicInfoReg(BaseReg):
     _ntcFields = [f'ntc{i}' for i in range(8)]
     _fetBits = 'chg_fet_en', 'dsg_fet_en'
     _valueNames = [
-        'pack_mv', 'pack_ma', 'cap_rem', 
-        'cap_nom', 'cycle_cnt', 
+        'pack_mv', 'pack_ma', 'cap_bal', 
+        'cap_tot', 'cycle_cnt', 
         'year', 'month', 'day',
         *_balBits,
         *_faultBits,
@@ -582,11 +539,11 @@ class BasicInfoReg(BaseReg):
         offset = 0
         fmt = '>HhHHH2s'
         values = struct.unpack_from(fmt, payload, offset)
-        self._pack_mv, self._pack_ma, self._cap_rem, self._cap_nom, self._cycle_cnt, date_raw = values
+        self._pack_mv, self._pack_ma, self._cap_bal, self._cap_tot, self._cycle_cnt, date_raw = values
         self._pack_mv *= 10
         self._pack_ma *= 10
-        self._cap_rem *= 10
-        self._cap_nom *= 10
+        self._cap_bal *= 10
+        self._cap_tot *= 10
         self._year, self._month, self._day = DateReg.unpackDate(date_raw)
         offset += struct.calcsize(fmt)
 
