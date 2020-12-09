@@ -1,104 +1,8 @@
 #!/usr/bin/env python
 
-from enum import Enum
 from .parsers import *
-
-class Unit(Enum):
-    MV  = ('millivolt', 'mV')
-    V   = ('volt', 'V')
-    C   = ('Celsius', '°C')
-    S   = ('second', 's')
-    K   = ('Kelvin', 'K')
-    MA  = ('milliampere', 'mA')
-    MAH = ('milliampere hour', 'mAh')
-    AH  = ('ampere hour', 'Ah')
-    A   = ('ampere', 'A')
-    PCT = ('percent', '%')
-    MO  = ('milliohms', 'mΩ')
-
-    def __init__(self, long_name, symbol):
-        self.long_name = long_name
-        self.symbol = symbol
-
-class LabelEnum(Enum):
-    def __new__(cls, display, value):
-        obj = object.__new__(cls)
-        obj.val = value
-        obj.display = display
-        return obj
-
-    def __str__(self):
-        return str(self.display)
-
-    @classmethod
-    def byDisplay(cls, value):
-        for v in cls:
-            if value == v.display:
-                return v
-        return None
-
-    @classmethod
-    def byValue(cls, value):
-        for v in cls:
-            if value == v.val:
-                return v
-        return None
-
-class Dsgoc2Enum(LabelEnum):
-    _8MV  = (8,   0x0)
-    _11MV = (11,  0x1)
-    _14MV = (14 , 0x2)
-    _17MV = (17 , 0x3)
-    _19MV = (19 , 0x4)
-    _22MV = (22 , 0x5)
-    _25MV = (25 , 0x6)
-    _28MV = (28 , 0x7)
-    _31MV = (31 , 0x8)
-    _33MV = (33 , 0x9)
-    _36MV = (36 , 0xa)
-    _39MV = (39 , 0xb)
-    _42MV = (42 , 0xc)
-    _44MV = (44 , 0xd)
-    _47MV = (47 , 0xe)
-    _50MV = (50 , 0xf)
-
-class Dsgoc2DelayEnum(LabelEnum):
-    _8MS    = (8,    0x0)
-    _20MS   = (20,   0x1)
-    _40MS   = (40,   0x2)
-    _80MS   = (80,   0x3)
-    _160MS  = (160,  0x4)
-    _320MS  = (320,  0x5)
-    _640MS  = (640,  0x6)
-    _1280MS = (1280, 0x7)
-
-class ScEnum(LabelEnum):
-    _22MV  = (22,  0x0)
-    _33MV  = (33,  0x1)
-    _44MV  = (44,  0x2)
-    _56MV  = (56,  0x3)
-    _67MV  = (67,  0x4)
-    _78MV  = (78,  0x5)
-    _89MV  = (89,  0x6)
-    _100MV = (100, 0x7)
-
-class ScDelayEnum(LabelEnum):
-    _70US  = (70,  0x0) 
-    _100US = (100, 0x1) 
-    _200US = (200, 0x2) 
-    _400US = (400, 0x3) 
-
-class CuvpHighDelayEnum(LabelEnum):
-    _1S  = (1,  0x0)
-    _4S  = (4,  0x1)
-    _8S  = (8,  0x2)
-    _16S = (16, 0x3)
-
-class CovpHighDelayEnum(LabelEnum):
-    _1S  = (1,  0x0)
-    _2S  = (2,  0x1)
-    _4S  = (4,  0x2)
-    _8S  = (8,  0x3)
+from .enums import *
+import struct
 
 class BaseReg:
     'register base class; mostly exists for documenting methods and properties'
@@ -404,7 +308,7 @@ class DateReg(BaseReg):
 
     def unpack(self, payload):
         value = struct.unpack('>H', payload)[0]
-        self._year, self._month, self._day = DateParser.decode(payload)
+        self._year, self._month, self._day = DateParser.decode(value)
     
     def pack(self):
         return struct.pack('>H', DateParser.encode(self._year, self._month, self._day))
@@ -494,7 +398,7 @@ class CxvpHighDelayScRelReg(BaseReg):
 
     def unpack(self, payload):
         b1, self._sc_rel= struct.unpack('>BB', payload)
-        self._cuvp_high_delay, self._covp_high_delay = CxvpDelayParser.decode(b1)
+        self._covp_high_delay, self._cuvp_high_delay = CxvpDelayParser.decode(b1)
     
     def pack(self):
         b1 = CxvpDelayParser.encode(self._cuvp_high_delay, self._covp_high_delay)
@@ -537,14 +441,14 @@ class BasicInfoReg(BaseReg):
 
     def unpack(self, payload):
         offset = 0
-        fmt = '>HhHHH2s'
+        fmt = '>HhHHHH'
         values = struct.unpack_from(fmt, payload, offset)
         self._pack_mv, self._pack_ma, self._cycle_cap, self._design_cap, self._cycle_cnt, date_raw = values
         self._pack_mv *= 10
         self._pack_ma *= 10
         self._cycle_cap *= 10
         self._design_cap *= 10
-        self._year, self._month, self._day = DateReg.unpackDate(date_raw)
+        self._year, self._month, self._day = DateParser.decode(date_raw)
         offset += struct.calcsize(fmt)
 
         fmt = '>LHBBBBB'
@@ -562,10 +466,10 @@ class BasicInfoReg(BaseReg):
             fn = f'_ntc{i}'
             if i < self._ntc_cnt:
                 o = offset + i *2
-                setattr(self, fn, TempReg.unpackTemp(payload[o:o+2]))
+                date_raw = struct.unpack_from('>H', payload,o)[0]
+                setattr(self, fn, TempParser.decode(date_raw)[0])
             else:
                 setattr(self, fn, None)
-
 
 class CellInfoReg(BaseReg):
     def __init__(self, regName, adx):

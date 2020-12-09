@@ -309,13 +309,13 @@ class JBD:
         try:
             self.open()
             self.exitFactory()
-            cmd = self.readCmd(cellInfoReg.adx)
+            cmd = self.readCmd(self.cellInfoReg.adx)
             self.s.write(cmd)
             ok, payload = self.readPacket()
             if not ok: raise BMSError()
             if payload is None: raise TimeoutError()
-            cellInfoReg.unpack(payload)
-            return dict(cellInfoReg)
+            self.cellInfoReg.unpack(payload)
+            return dict(self.cellInfoReg)
         finally:
             self.close()
 
@@ -323,13 +323,13 @@ class JBD:
         try:
             self.open()
             self.exitFactory()
-            cmd = self.readCmd(deviceInfoReg.adx)
+            cmd = self.readCmd(self.deviceInfoReg.adx)
             self.s.write(cmd)
             ok, payload = self.readPacket()
             if not ok: raise BMSError()
             if payload is None: raise TimeoutError()
-            deviceInfoReg.unpack(payload)
-            return dict(deviceInfoReg)
+            self.deviceInfoReg.unpack(payload)
+            return dict(self.deviceInfoReg)
         finally:
             self.close()
     

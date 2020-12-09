@@ -5,18 +5,25 @@
 # 
 # wherever possible, these are shared by registers and the persist library
 
-from .registers import (Dsgoc2Enum, Dsgoc2DelayEnum, 
+from .enums import (Dsgoc2Enum, Dsgoc2DelayEnum, 
                         ScEnum, ScDelayEnum, CuvpHighDelayEnum, 
                         CovpHighDelayEnum, LabelEnum)
 
+import struct
+
 class BaseParser: pass
+
 
 class IntParserX1(BaseParser):
     'encodes or decodes a single integer'
     factor = 1
     @classmethod
     def decode(cls, string):
-        return (int(string) * cls.factor,)
+        # fileformat stores int16_t as uint16_t
+        # need to convert to signed
+        v = int(string) 
+        v = struct.unpack('>h', struct.pack('>H',v))[0]
+        return (v * cls.factor,)
 
     @classmethod
     def encode(cls, values):
@@ -77,8 +84,8 @@ class BitfieldParser(BaseParser):
 
 class CxvpDelayParser(BaseParser):
     @staticmethod
-    def decode(string):
-        i = int(string)
+    def decode(value):
+        i = int(value)
         covp_high_delay = (i >> 6) & 0x3
         cuvp_high_delay = (i >> 4) & 0x3
         return (CovpHighDelayEnum.byValue(covp_high_delay), 
