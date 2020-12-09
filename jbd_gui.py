@@ -1164,7 +1164,7 @@ class Main(wx.Frame):
             traceback.print_tb(evt.data.__traceback__)
             print(f'eeprom error: {repr(evt.data)}')
         elif evt.data is not None:
-            self.populateEeprom(evt.data)
+            self.scatterEeprom(evt.data)
         else:
             pass # was eeprom write ...
 
@@ -1239,9 +1239,7 @@ class Main(wx.Frame):
         elif n == 'save_eeprom_btn':
             self.saveEeprom()
         elif n == 'test_btn':
-            print('skipping read info -- validate')
-            #self.readInfo()
-            self.Validate()
+            self.readInfo()
         elif n == 'clear_errors_btn':
             self.clearErrors()
         else:
