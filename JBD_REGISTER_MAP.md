@@ -75,13 +75,13 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
      <td>0x4</td>
      <td>Balance Capacity</td>
      <td>unsigned 16 bit, unit: 10mAH</td>
-     <td>cap_bal</td>
+     <td>cycle_cap</td>
     </tr>
     <tr>
      <td>0x6</td>
      <td>Full Capacity</td>
      <td>unsigned 16 bit, unit: 10mAH</td>
-     <td>cap_tot</td>
+     <td>design_cap</td>
     </tr>
     <tr>
      <td>0x8</td>
