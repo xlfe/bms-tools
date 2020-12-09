@@ -373,28 +373,3 @@ if errors:
         print(error)
     raise RuntimeError('register errors')
 del errors
-
-def main():
-    from pprint import pprint
-    import argparse
-    p = argparse.ArgumentParser()
-    p.add_argument('port')
-    args = p.parse_args()
-    s = serial.Serial(args.port, 9600, timeout=.2)
-    j = JBD(s)
-
-    if 0:
-        eeprom = j.readEeprom()
-        pprint(eeprom)
-    elif 0:
-        basic = j.readBasicInfo()
-        pprint(basic)
-    elif 0:
-        cell = j.readCellInfo()
-        pprint(cell)
-    elif 1:
-        device = j.readDeviceInfo()
-        pprint(device)
-
-if __name__ == '__main__':
-    main()
