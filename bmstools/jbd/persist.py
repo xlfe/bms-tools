@@ -45,7 +45,10 @@ class JBDPersist:
         'VoltageCap20':         (('cap_20',), IntParserX1),
         'HardCellOverVoltage':  (('covp_high',), IntParserX1),
         'HardCellUnderVoltage': (('cuvp_high',), IntParserX1),
-         
+        'HardChgOverCurrent':   (('sc', 'sc_delay', 'sc_dsgoc_x2'), ScParser),
+        'HardDsgOverCurrent':   (('dsgoc2', 'dsgoc2_delay'), Dsgoc2Parser),
+        'HardTime':             (('covp_high_delay', 'cuvp_high_delay'), CxvpDelayParser),
+        'SCReleaseTime':        (('sc_rel',), IntParserX1),
         'ChgUTDelay':           (('chgut_delay',), IntParserX1),
         'ChgOTDelay':           (('chgot_delay',), IntParserX1),
         'DsgUTDelay':           (('dsgut_delay',), IntParserX1),
@@ -58,15 +61,9 @@ class JBDPersist:
         'ChgOCRDelay':          (('chgoc_rel',), IntParserX1),
         'DsgOCDelay':           (('dsgoc_delay',), IntParserX1),
         'DsgOCRDelay':          (('dsgoc_rel',), IntParserX1),
-         
         'ManufacturerName':     (('mfg_name',), StrParser),
         'DeviceName':           (('device_name',), StrParser),
         'BarCode':              (('barcode',), StrParser),
-        'HardChgOverCurrent':   (('sc', 'sc_delay', 'sc_dsgoc_x2'), ScParser),
-        'HardDsgOverCurrent':   (('dsgoc2', 'dsgoc2_delay'), Dsgoc2Parser),
-
-        'HardTime':             (('covp_high_delay', 'cuvp_high_delay'), CxvpDelayParser),
-        'SCReleaseTime':        (('sc_rel',), IntParserX1),
     }
 
     def __init__(self):
@@ -88,5 +85,23 @@ class JBDPersist:
             ret.update(dict(zip(valueNames, values)))
         return ret
 
-    def serialize(self, values):
-        pass
+    def serialize(self, data):
+        allPassedValueNames = set(data.keys())
+        # noidea what this is
+        lines = ['  FileCode               3838']
+
+        for fieldName, meta in self.fields.items():
+            valueNames, parser = meta
+            valueNameSet = set(valueNames)
+            foundValueNames = valueNameSet & allPassedValueNames
+            if foundValueNames != valueNameSet:
+                raise ValueError(f'savefile field "{field}"" requires values {tuple(valueNames)}')
+            values = [data[i] for i in valueNames]
+            print(fieldName, valueNames, 'values:', ' '.join(repr(i) for i in values))
+            if parser == StrParser:
+                spacer = ' ' * (23 - len(fieldName))
+            else:
+                spacer = ' ' * 8
+            lines.append(f'  {fieldName}{spacer}{parser.encode(values)}')
+        return bytes(''.join([i + '\r\r\n' for i in lines]), 'utf-8')
+
