@@ -4,6 +4,7 @@ import sys
 import time
 import re
 import serial
+import serial.tools.list_ports
 import math
 import enum
 import random
@@ -96,6 +97,47 @@ ranges = {
     'shunt_res':    (0.0, 6553.5, .1),
 }
 
+class SerialPortDialog(wx.Dialog):
+
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+
+        self.SetTitle('Serial Port Settings')
+
+        vbox = wx.BoxSizer(wx.VERTICAL)
+
+        ports = serial.tools.list_ports.comports()
+        portNames = [p.name for p in ports]
+
+        b1 = wx.ComboBox(self, choices=portNames)
+        b2 = wx.Button(self, label='16 Colors')
+        b3 = wx.Button(self, label='2 Colors')
+
+        vbox.Add(b1, flag=wx.ALIGN_CENTER | wx.TOP, border = 10)
+        vbox.Add(b2, flag=wx.ALIGN_CENTER)
+        vbox.Add(b3, flag=wx.ALIGN_CENTER)
+
+        hbox = wx.BoxSizer(wx.HORIZONTAL)
+        okButton = wx.Button(self, label='Ok')
+        closeButton = wx.Button(self, label='Close')
+        hbox.Add(okButton, flag=wx.ALL, border = 5)
+        hbox.Add(closeButton, flag=wx.ALL, border=5)
+
+        #vbox.Add(hbox, flag=wx.ALIGN_CENTER|wx.ALL, border=10)
+        vbox.Add(hbox)
+
+        okButton.Bind(wx.EVT_BUTTON, self.OnClose)
+        closeButton.Bind(wx.EVT_BUTTON, self.OnClose)
+        self.SetSizerAndFit(vbox)
+
+
+    def refresh(self):
+        pass
+
+
+    def OnClose(self, e):
+        self.Destroy()
+
 class BetterChoice(wx.Choice):
     def __init__(self, parent, **kwargs):
         choices = kwargs.get('choices')
@@ -137,7 +179,6 @@ class SVGImage(wx.Panel):
         self.Bind(wx.EVT_PAINT, self.OnPaint)
         self.SetImage(img)
         self.Refresh()
-
 
     def SetImage(self, img):
         if isinstance(img, wx.svg.SVGimage):
@@ -190,50 +231,6 @@ class BoolImage(SVGImage):
     def SetValue(self, which):
         self.SetImage(self.img1 if bool(which) else self.img2)
         self.Refresh()
-
-class IntValidator(wx.Validator):
-    def __init__(self, lower, upper):
-        super().__init__()
-        self.lower = lower
-        self.upper = upper
-
-    def Clone(self):
-        print('clone')
-        return self.__class__(self.lower, self.upper)
-
-    def Validate(self, win):
-        print('validate')
-            
-        return True
-
-        textCtrl = self.GetWindow()
-        text = textCtrl.GetValue()
-        print('got value:', text)
-
-        if text.isdigit():
-            return True
-        else:
-            wx.MessageBox("Please enter numbers only", "Invalid Input",
-            wx.OK | wx.ICON_ERROR)
-        return False
-
-    def TransferToWindow(self):
-        print('xferto')
-        return True
-
-    def TransferFromWindow(self):
-        print('xferfrom')
-        return True
-
-    def OnChar(self, event):
-        print('onchar')
-        keycode = int(event.GetKeyCode())
-        if keycode < 256:
-            key = chr(keycode)
-            if key not in string.digits:
-                return
-        event.Skip()
-
 
 class LayoutGen: 
     def __init__(self, parent):
@@ -1017,8 +1014,8 @@ class Main(wx.Frame):
         kwargs['style'] = wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX)
         wx.Frame.__init__(self, *args, **kwargs)
 
-        #self.j = jbd.JBD(serial.Serial('COM4'))
-        self.j = jbd.JBD(serial.Serial('/dev/ttyUSB0'))
+        self.j = jbd.JBD(serial.Serial('COM4'))
+        #self.j = jbd.JBD(serial.Serial('/dev/ttyUSB0'))
 
         font = wx.Font(8, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         self.SetFont(font)
@@ -1067,7 +1064,7 @@ class Main(wx.Frame):
         sizer.Add(nb_panel, 1, wx.EXPAND)
         self.SetSizer(sizer)
 
-        testButton = wx.Button(self, label='Test', name = 'test_btn')
+        testButton = wx.Button(self, label='Serial', name = 'serial_btn')
         self.Bind(wx.EVT_BUTTON, self.onButtonClick)
         bot_sizer = wx.FlexGridSizer(4)
         bot_sizer.Add(wx.StaticText(self, name='status_txt'), 1, wx.ALIGN_CENTER_VERTICAL |wx.TEXT_ALIGNMENT_LEFT)
@@ -1142,8 +1139,6 @@ class Main(wx.Frame):
         self.set('info_mfg_date', date)
         self.set('info_version', f"0x{basicInfo['version']:02X}")
 
-        pprint(basicInfo)
-
         cfe = basicInfo['chg_fet_en']
         dfe = basicInfo['dsg_fet_en']
         self.set('info_chg_fet_status_txt', 'ENABLED' if cfe else 'DISABLED')
@@ -1159,7 +1154,6 @@ class Main(wx.Frame):
         self.GetStatusBar().SetValue(evt.value)
 
     def onEepromDone(self, evt):
-        print('eeprom done')
         if isinstance(evt.data, Exception):
             traceback.print_tb(evt.data.__traceback__)
             print(f'eeprom error: {repr(evt.data)}')
@@ -1238,12 +1232,17 @@ class Main(wx.Frame):
             self.loadEeprom()
         elif n == 'save_eeprom_btn':
             self.saveEeprom()
-        elif n == 'test_btn':
-            self.readInfo()
+        elif n == 'serial_btn':
+            self.chooseSerialPort()
         elif n == 'clear_errors_btn':
             self.clearErrors()
         else:
             print(f'unknown button {n}')
+
+    def chooseSerialPort(self):
+        with SerialPortDialog(None) as d:
+            print(d)
+            d.ShowModal()
 
     def readEeprom(self):
         worker = EepromWorker(self, self.j)
@@ -1255,21 +1254,34 @@ class Main(wx.Frame):
         worker.run(worker.writeEeprom, data)
 
     def loadEeprom(self):
-        data = self.j.loadEepromFile('factory.fig')
-        self.scatterEeprom(data)
+        with wx.FileDialog(self, 'Load EEPROM', wildcard='Data files (*.fig)|*.fig',
+                    style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
+            if fileDialog.ShowModal() == wx.ID_CANCEL: return
+            try:
+                fn = fileDialog.GetPath()
+                data = self.j.loadEepromFile(fn)
+                self.scatterEeprom(data)
+            except:
+                wx.LogError('Cannot open file "{fn}".')
 
     def saveEeprom(self):
-        data = self.gatherEeprom()
-        self.j.saveEepromFile('factory_out.fig', data)
+        with wx.FileDialog(self, 'Save EEPROM', wildcard='Data files (*.fig)|*.fig',
+                        style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
+
+            if fileDialog.ShowModal() == wx.ID_CANCEL: return
+            try:
+                fn = fileDialog.GetPath()
+                data = self.gatherEeprom()
+                self.j.saveEepromFile(fn, data)
+            except:
+                wx.LogError(f'Cannot save current data in file "{fn}".')
 
     def clearErrors(self):
         try:
             self.j.clearErrors()
-
             for c in ChildIter.iterNamed(self):
                 if not c.Name.endswith('_err_cnt'): continue
                 if not c.Name.startswith('eeprom_'): continue
-                print(c.Name)
                 c.SetLabel('0')
         except jbd.BMSError:
             self.setStatus('BMS comm error')
