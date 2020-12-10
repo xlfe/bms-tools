@@ -17,7 +17,7 @@ gui:
 		echo Windows build ...
 		export PATHSEP=";"
 	fi
-	pyinstaller.exe jbd_gui.py --noconfirm ${WINDOWED} ${ONEFILE} --icon "img/batt_icon_128.ico" --add-data "img$${PATHSEP}img" -n bms_utils_jbd
+	pyinstaller.exe jbd_gui.py --noconfirm ${WINDOWED} ${ONEFILE} --icon "img/batt_icon_128.ico" --add-data "img$${PATHSEP}img" -n bms_tools_jbd
 
 clean:
 	rm -Rf build dist
