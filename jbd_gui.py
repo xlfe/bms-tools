@@ -1258,6 +1258,10 @@ class Main(wx.Frame):
         data = self.j.loadEepromFile('factory.fig')
         self.scatterEeprom(data)
 
+    def saveEeprom(self):
+        data = self.gatherEeprom()
+        self.j.saveEepromFile('factory_out.fig', data)
+
     def clearErrors(self):
         try:
             self.j.clearErrors()
