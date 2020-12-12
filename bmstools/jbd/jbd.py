@@ -127,11 +127,11 @@ class JBD:
             print(*args, **kwargs)
 
     @property
-    def port(self):
-        return s
+    def serial(self):
+        return self.s
     
-    @port.setter
-    def port(self, s):
+    @serial.setter
+    def serial(self, s):
         self.s = s 
 
     def open(self):
