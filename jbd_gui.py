@@ -1035,6 +1035,8 @@ class Main(wx.Frame):
         port = self.getLastSerialPort()
         print(f'Using port: {port.name or "None"} {repr(port)}')
         self.j = jbd.JBD(port)
+        self.scanTimer = wx.Timer(self)
+        self.accessLock = threading.Lock()
 
         font = wx.Font(8, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         self.SetFont(font)
@@ -1088,7 +1090,11 @@ class Main(wx.Frame):
         t.Enable(0)
         bot_sizer.Add(t)
         serialButton = wx.Button(self, label='...', name = 'serial_btn')
+        self.startStopButton = wx.Button(self, label='Start', name = 'start_stop_btn')
+        bot_sizer.AddSpacer(5)
         bot_sizer.Add(serialButton)
+        bot_sizer.AddSpacer(20)
+        bot_sizer.Add(self.startStopButton)
         sizer.Add(bot_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         p = ProgressBar(self)
@@ -1097,6 +1103,7 @@ class Main(wx.Frame):
         self.Bind(EepromWorker.EVT_EEP_PROG, self.onProgress)
         self.Bind(EepromWorker.EVT_EEP_DONE, self.onEepromDone)
         self.Bind(wx.EVT_BUTTON, self.onButtonClick)
+        self.Bind(wx.EVT_TIMER, self.onScanTimer)
         self.updateSerialPort()
 
         # ---
@@ -1135,9 +1142,15 @@ class Main(wx.Frame):
         
 
     def readInfo(self):
-        basicInfo = self.j.readBasicInfo()
-        cellInfo = self.j.readCellInfo()
-        deviceInfo = self.j.readDeviceInfo()
+        if not self.accessLock.acquire(timeout=0):
+            return
+        try:
+            basicInfo = self.j.readBasicInfo()
+            cellInfo = self.j.readCellInfo()
+            deviceInfo = self.j.readDeviceInfo()
+        finally:
+            self.accessLock.release()
+            
         temps = [v for k,v in basicInfo.items() if self.ntc_RE.match(k) and v is not None]
         bals  = [v for k,v in basicInfo.items() if k.startswith('bal') and v is not None]
         volts = [v for v in cellInfo.values() if v is not None]
@@ -1191,6 +1204,7 @@ class Main(wx.Frame):
         self.GetStatusBar().SetValue(evt.value)
 
     def onEepromDone(self, evt):
+        self.accessLock.release()
         if isinstance(evt.data, Exception):
             traceback.print_tb(evt.data.__traceback__)
             print(f'eeprom error: {repr(evt.data)}')
@@ -1263,11 +1277,25 @@ class Main(wx.Frame):
             self.chooseSerialPort()
         elif n == 'clear_errors_btn':
             self.clearErrors()
+        elif n == 'start_stop_btn':
+            self.startStop()
         else:
             print(f'unknown button {n}')
 
+    def startStop(self):
+        if self.scanTimer.IsRunning():
+            self.scanTimer.Stop()
+            self.startStopButton.SetLabel('Start')
+        else:
+            self.scanTimer.Start(3000)
+            self.startStopButton.SetLabel('Stop')
+
+    def onScanTimer(self, evt):
+        print('scan')
+        self.readInfo()
 
     def readEeprom(self):
+        self.accessLock.acquire()
         worker = EepromWorker(self, self.j)
         worker.run(worker.readEeprom)
 
@@ -1300,14 +1328,15 @@ class Main(wx.Frame):
                 wx.LogError(f'Cannot save current data in file "{fn}".')
 
     def clearErrors(self):
-        try:
-            self.j.clearErrors()
-            for c in ChildIter.iterNamed(self):
-                if not c.Name.endswith('_err_cnt'): continue
-                if not c.Name.startswith('eeprom_'): continue
-                c.SetLabel('0')
-        except jbd.BMSError:
-            self.setStatus('BMS comm error')
+        with self.accessLock:
+            try:
+                self.j.clearErrors()
+                for c in ChildIter.iterNamed(self):
+                    if not c.Name.endswith('_err_cnt'): continue
+                    if not c.Name.startswith('eeprom_'): continue
+                    c.SetLabel('0')
+            except jbd.BMSError:
+                self.setStatus('BMS comm error')
 
     def setStatus(self, t):
         self.GetStatusBar().SetStatusText(t)
