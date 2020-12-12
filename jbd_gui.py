@@ -20,6 +20,10 @@ import wx.lib.scrolledpanel as scrolled
 import wx.lib.newevent
 import wx.lib.masked.numctrl
 
+appName = 'JBD BMS Tools'
+appVersion = '0.0.1-alpha'
+releaseDate = 'N/A'
+
 import bmstools.jbd as jbd
 
 try:
@@ -99,44 +103,57 @@ ranges = {
 
 class SerialPortDialog(wx.Dialog):
 
-    def __init__(self, *args, **kw):
-        super().__init__(*args, **kw)
+    def __init__(self, *args, **kwargs):
+        self.curPort = kwargs.pop('port', None)
+        super().__init__(*args, **kwargs)
 
         self.SetTitle('Serial Port Settings')
 
         vbox = wx.BoxSizer(wx.VERTICAL)
 
-        ports = serial.tools.list_ports.comports()
-        portNames = [p.name for p in ports]
+        self.portBox = BetterChoice(self, choices=[], name='port')
+        self.refresh()
 
-        b1 = wx.ComboBox(self, choices=portNames)
-        b2 = wx.Button(self, label='16 Colors')
-        b3 = wx.Button(self, label='2 Colors')
-
-        vbox.Add(b1, flag=wx.ALIGN_CENTER | wx.TOP, border = 10)
-        vbox.Add(b2, flag=wx.ALIGN_CENTER)
-        vbox.Add(b3, flag=wx.ALIGN_CENTER)
+        vbox.Add(self.portBox, flag=wx.ALIGN_CENTER | wx.TOP, border = 10)
 
         hbox = wx.BoxSizer(wx.HORIZONTAL)
         okButton = wx.Button(self, label='Ok')
-        closeButton = wx.Button(self, label='Close')
+        refreshButton = wx.Button(self, label='Refresh', name='refresh_btn')
+        closeButton = wx.Button(self, label='Close', name = 'close_btn')
         hbox.Add(okButton, flag=wx.ALL, border = 5)
+        hbox.Add(refreshButton, flag=wx.ALL, border = 5)
         hbox.Add(closeButton, flag=wx.ALL, border=5)
 
         #vbox.Add(hbox, flag=wx.ALIGN_CENTER|wx.ALL, border=10)
         vbox.Add(hbox)
 
-        okButton.Bind(wx.EVT_BUTTON, self.OnClose)
-        closeButton.Bind(wx.EVT_BUTTON, self.OnClose)
+        okButton.Bind(wx.EVT_BUTTON, self.onButton)
+        refreshButton.Bind(wx.EVT_BUTTON, self.onButton)
+        closeButton.Bind(wx.EVT_BUTTON, self.onButton)
         self.SetSizerAndFit(vbox)
 
-
     def refresh(self):
-        pass
+        self.ports = serial.tools.list_ports.comports()
+        self.portBox.Set([p.device for p in self.ports])
+        if not self.portBox.SetValue(self.curPort):
+            if self.portBox.GetCount():
+                self.portBox.SetSelection(0)
 
+    def onButton(self, e):
+        n = e.EventObject.Name
+        if n == 'refresh_btn':
+            self.refresh()
+            return
 
-    def OnClose(self, e):
-        self.Destroy()
+        self.selectedPort = serial.Serial()
+        i = self.portBox.GetSelection()
+        if i != wx.NOT_FOUND:
+            self.selectedPort = self.ports[i].device
+        
+        if n == 'close_btn':
+            self.EndModal(wx.ID_CANCEL)
+        else:
+            self.EndModal(wx.ID_OK)
 
 class BetterChoice(wx.Choice):
     def __init__(self, parent, **kwargs):
@@ -154,9 +171,10 @@ class BetterChoice(wx.Choice):
     def SetValue(self, value):
         idx = self.FindString(str(value))
         if idx == wx.NOT_FOUND: 
-            print(f'{self.__class__.__name__}: {self.Name} to unknown choice {value}')
-            return
+            print(f'{self.__class__.__name__}: "{self.Name}" set to unknown choice {value}')
+            return False
         self.SetSelection(idx)
+        return True
 
 class EnumChoice(BetterChoice):
     def __init__(self, parent, **kwargs):
@@ -1014,8 +1032,9 @@ class Main(wx.Frame):
         kwargs['style'] = wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX)
         wx.Frame.__init__(self, *args, **kwargs)
 
-        self.j = jbd.JBD(serial.Serial('COM4'))
-        #self.j = jbd.JBD(serial.Serial('/dev/ttyUSB0'))
+        port = self.getLastSerialPort()
+        print(f'Using port: {port.name or "None"} {repr(port)}')
+        self.j = jbd.JBD(port)
 
         font = wx.Font(8, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         self.SetFont(font)
@@ -1064,18 +1083,12 @@ class Main(wx.Frame):
         sizer.Add(nb_panel, 1, wx.EXPAND)
         self.SetSizer(sizer)
 
-        testButton = wx.Button(self, label='Serial', name = 'serial_btn')
-        self.Bind(wx.EVT_BUTTON, self.onButtonClick)
-        bot_sizer = wx.FlexGridSizer(4)
-        bot_sizer.Add(wx.StaticText(self, name='status_txt'), 1, wx.ALIGN_CENTER_VERTICAL |wx.TEXT_ALIGNMENT_LEFT)
-        bot_sizer.Add(testButton, 1, wx.TEXT_ALIGNMENT_CENTER)
-        bot_sizer.Add(wx.StaticText(self, name='serial_txt'), 1, wx.ALIGN_CENTER_VERTICAL |wx.TEXT_ALIGNMENT_CENTER)
-        t = wx.StaticText(self, name='date_time_txt')
-        t.SetBackgroundColour(wx.GREEN)
-        bot_sizer.Add(t, 1, wx.ALIGN_CENTER_VERTICAL | wx.TEXT_ALIGNMENT_RIGHT)
-        for c in range(bot_sizer.Cols):
-            bot_sizer.AddGrowableCol(c)
-
+        bot_sizer = wx.BoxSizer()
+        t = wx.TextCtrl(self, name='serial_port_txt')
+        t.Enable(0)
+        bot_sizer.Add(t)
+        serialButton = wx.Button(self, label='...', name = 'serial_btn')
+        bot_sizer.Add(serialButton)
         sizer.Add(bot_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         p = ProgressBar(self)
@@ -1083,6 +1096,8 @@ class Main(wx.Frame):
 
         self.Bind(EepromWorker.EVT_EEP_PROG, self.onProgress)
         self.Bind(EepromWorker.EVT_EEP_DONE, self.onEepromDone)
+        self.Bind(wx.EVT_BUTTON, self.onButtonClick)
+        self.updateSerialPort()
 
         # ---
 
@@ -1094,8 +1109,30 @@ class Main(wx.Frame):
 
         self.Bind(wx.EVT_SHOW, sizeFix)
 
-        self.setupClockTimer()
+    def chooseSerialPort(self):
+        with SerialPortDialog(None, port = self.j.serial.port) as d:
+            if d.ShowModal() == wx.ID_CANCEL:
+                return
+            self.j.serial.port = d.selectedPort
+            config = wx.Config.Get() 
+            config.Write('serial_port', self.j.serial.port)
+            config.Flush()
+            self.updateSerialPort()
 
+    def updateSerialPort(self):
+        self.FindWindowByName('serial_port_txt').SetValue(self.j.serial.port)
+
+    def getLastSerialPort(self):
+        ports = serial.tools.list_ports.comports()
+        config = wx.Config.Get()
+        serialPortName = config.Read('serial_port')
+        print(f'last stored port name is {serialPortName}')
+        for p in ports:
+            if p.device == serialPortName:
+                return serial.Serial(p.device)
+        if ports: return serial.Serial(ports[0].device)
+        return serial.Serial()
+        
 
     def readInfo(self):
         basicInfo = self.j.readBasicInfo()
@@ -1176,16 +1213,6 @@ class Main(wx.Frame):
             data[n] = self.get(c.Name)
         return data
 
-    def setupClockTimer(self):
-        self.clockTimer = wx.Timer(self)
-        self.Bind(wx.EVT_TIMER, self.onTimer)
-        self.clockTimer.Start(1000)
-
-    def onTimer(self, event):
-        t = self.FindWindowByName('date_time_txt')
-        t.SetLabel(time.asctime())
-        self.Layout()
-
     def set(self, name, value):
         svalue = str(value)
         w = self.FindWindowByName(name)
@@ -1239,10 +1266,6 @@ class Main(wx.Frame):
         else:
             print(f'unknown button {n}')
 
-    def chooseSerialPort(self):
-        with SerialPortDialog(None) as d:
-            print(d)
-            d.ShowModal()
 
     def readEeprom(self):
         worker = EepromWorker(self, self.j)
@@ -1330,13 +1353,13 @@ class EepromWorker:
 
 
 
-appName = 'BMS Tools'
-appVersion = '0.0.1-alpha'
-releaseDate = 'N/A'
-
     
 class MyApp(wx.App):
     def OnInit(self):
+        configAppName = appName.lower().replace(' ','_') 
+        self.SetAppName(configAppName)
+        self.SetAppDisplayName(appName)
+
         frame = Main(None, title = f'{appName} {appVersion}',style = wx.DEFAULT_FRAME_STYLE | wx.WS_EX_VALIDATE_RECURSIVELY )
         frame.SetIcon(wx.Icon(os.path.join(base_path, 'img', 'batt_icon_128.ico')))
         frame.Show()
