@@ -23,6 +23,7 @@ import wx.lib.masked.numctrl
 appName = 'JBD BMS Tools'
 appVersion = '0.0.1-alpha'
 releaseDate = 'N/A'
+appNameWithVersion = f'{appName} {appVersion}'
 
 import bmstools.jbd as jbd
 
@@ -101,6 +102,51 @@ ranges = {
     'shunt_res':    (0.0, 6553.5, .1),
 }
 
+class TextFrame(wx.Frame):
+    CloseEvent, EVT_TEXTFRAME_CLOSE = wx.lib.newevent.NewEvent()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        self.txt = wx.TextCtrl(self, style = wx.TE_RICH | wx.TE_MULTILINE | wx.TE_BESTWRAP | wx.TE_READONLY)
+        clearButton = wx.Button(self, label = 'Clear', name = 'clear_btn')
+        vbox.Add(self.txt, 1, wx.EXPAND)
+        vbox.Add(clearButton)
+        self.SetSizer(vbox)
+        self.outStyle = wx.TextAttr(wx.BLACK, wx.WHITE)
+        self.errStyle = wx.TextAttr(wx.WHITE, wx.RED)
+        self.Bind(wx.EVT_CLOSE, self.onClose)
+        self.Bind(wx.EVT_BUTTON, self.onButton)
+
+    def onClose(self, evt):
+        evt.StopPropagation()
+        wx.PostEvent(self.Parent, self.CloseEvent())
+
+    def onButton(self, evt):
+        n = evt.EventObject.Name
+        if n == 'clear_btn':
+            self.txt.Clear()
+
+    def stdout(self, text):
+        self.txt.SetDefaultStyle(self.outStyle)
+        self.txt.write(text)
+
+    def stderr(self, text):
+        self.txt.SetDefaultStyle(self.errStyle)
+        self.txt.write(text)
+
+    write = stdout
+
+class WriteRedirect:
+    def __init__(self, func):
+        self.func = func
+    def write(self, text):
+        self.func(text)
+
+    def flush(self): pass
+
+
+
 class SerialPortDialog(wx.Dialog):
 
     def __init__(self, *args, **kwargs):
@@ -114,10 +160,15 @@ class SerialPortDialog(wx.Dialog):
         self.portBox = BetterChoice(self, choices=[], name='port')
         self.refresh()
 
-        vbox.Add(self.portBox, flag=wx.ALIGN_CENTER | wx.TOP, border = 10)
+        hbox = wx.BoxSizer()
+
+        hbox.Add(self.portBox, 0, wx.ALIGN_CENTER)
+        hbox.Add(wx.StaticText(self, label="9600 8N1"), 0, wx.ALIGN_CENTER | wx.LEFT, border = 5)
+        vbox.Add(hbox, 1, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 5)
 
         hbox = wx.BoxSizer(wx.HORIZONTAL)
         okButton = wx.Button(self, label='Ok')
+        okButton.SetDefault()
         refreshButton = wx.Button(self, label='Refresh', name='refresh_btn')
         closeButton = wx.Button(self, label='Close', name = 'close_btn')
         hbox.Add(okButton, flag=wx.ALL, border = 5)
@@ -862,40 +913,8 @@ class LayoutGen:
         fgs.AddMany(gen('SC',    'sc_err_cnt'))
         fgs.Add(wx.Button(sb, label='Clear', name='clear_errors_btn'))
 
-class ProgressBar(wx.StatusBar):
-    def __init__(self, parent):
-        self.parent = parent
-        super().__init__(parent=self.parent)
-        self.SetFieldsCount(3)
-        self.SetStatusText('0/0')
-        self.SetStatusText('Mango',1)
-        self.SetStatusWidths([100, 100, -1])
-        gauge_pos, gauge_size = self.get_gauge_dimensions()
-        self.gauge = wx.Gauge (self, -1, 100, gauge_pos, gauge_size)
-        # bindings
-        self.Bind(wx.EVT_SIZE, self.on_size)
-        self.Show()
-
-    def get_gauge_dimensions(self):
-        """Get gauge position and dimensions"""
-        c = self.GetFieldsCount()
-        pos_x, pos_y, dim_x, dim_y = self.GetFieldRect(c-1)
-        return (pos_x, pos_y), (dim_x, dim_y)
-        
-    def on_size(self, event):
-        """Resize gauge when the main frame is resized"""
-        size = self.GetSize()
-        self.SetSize(size)
-        gauge_pos, gauge_size = self.get_gauge_dimensions()
-        self.gauge.SetSize(gauge_size)
-        event.Skip()       
-        self.Update()
- 
-    def SetValue(self, value):
-        self.gauge.SetValue(value)
 
 class RoundGauge(wx.Panel):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.timer = wx.Timer(self)
@@ -1029,17 +1048,45 @@ class ChildIter:
 class Main(wx.Frame):
     ntc_RE = re.compile(r'ntc\d+')
     def __init__(self, *args, **kwargs):
+        icon = kwargs.pop('icon', None)
+        cli_args = kwargs.pop('cli_args', None)
         kwargs['style'] = wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX)
         wx.Frame.__init__(self, *args, **kwargs)
+
+
+        # debug window
+        self.debugWindow = TextFrame(self, title=f'{appName} debug window')
+        self.Bind(TextFrame.EVT_TEXTFRAME_CLOSE, self.onDebugWindowClose)
+
+        if icon: 
+            self.SetIcon(icon)
+            self.debugWindow.SetIcon(icon)
+
+        if not cli_args or not cli_args.no_redirect:
+            sys.stdout = WriteRedirect(self.debugWindow.stdout)
+        print(f'Welcome to {appNameWithVersion}\n')
 
         port = self.getLastSerialPort()
         print(f'Using port: {port.name or "None"} {repr(port)}')
         self.j = jbd.JBD(port)
-        self.scanTimer = wx.Timer(self)
         self.accessLock = threading.Lock()
+        self.worker = BkgWorker(self, self.j)
 
         font = wx.Font(8, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         self.SetFont(font)
+
+        # menu
+
+        self.menuBar = wx.MenuBar()
+        self.fileMenu = wx.Menu()
+        self.debugWindowItem = self.fileMenu.Append(wx.ID_ANY, 'Debug Window', 'Show debug window', kind = wx.ITEM_CHECK)
+        self.aboutItem = self.fileMenu.Append(wx.ID_ABOUT, 'About', f'About {appName}')
+        self.quitItem = self.fileMenu.Append(wx.ID_ANY, 'Quit')
+        self.menuBar.Append(self.fileMenu, '&File')
+        self.SetMenuBar(self.menuBar)
+        self.Bind(wx.EVT_MENU, self.onAbout, self.aboutItem)
+        self.Bind(wx.EVT_MENU, self.onQuit, self.quitItem)
+        self.Bind(wx.EVT_MENU, self.onDebugWindowToggle, self.debugWindowItem)
 
         layout = LayoutGen(self)
 
@@ -1091,19 +1138,22 @@ class Main(wx.Frame):
         bot_sizer.Add(t)
         serialButton = wx.Button(self, label='...', name = 'serial_btn')
         self.startStopButton = wx.Button(self, label='Start', name = 'start_stop_btn')
+        self.progressGauge = wx.Gauge(self)
+        self.statusText = wx.StaticText(self)
         bot_sizer.AddSpacer(5)
         bot_sizer.Add(serialButton)
         bot_sizer.AddSpacer(20)
         bot_sizer.Add(self.startStopButton)
+        bot_sizer.AddSpacer(20)
+        bot_sizer.Add(self.statusText)
+        bot_sizer.Add(self.progressGauge, 1 , wx.EXPAND | wx.LEFT, 20)
         sizer.Add(bot_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
-        p = ProgressBar(self)
-        self.SetStatusBar(p)
-
-        self.Bind(EepromWorker.EVT_EEP_PROG, self.onProgress)
-        self.Bind(EepromWorker.EVT_EEP_DONE, self.onEepromDone)
+        self.Bind(BkgWorker.EVT_EEP_PROG, self.onProgress)
+        self.Bind(BkgWorker.EVT_EEP_DONE, self.onEepromDone)
+        self.Bind(BkgWorker.EVT_SCAN_DATA, self.onScanData)
         self.Bind(wx.EVT_BUTTON, self.onButtonClick)
-        self.Bind(wx.EVT_TIMER, self.onScanTimer)
+        self.Bind(wx.EVT_CLOSE, self.onClose)
         self.updateSerialPort()
 
         # ---
@@ -1115,6 +1165,32 @@ class Main(wx.Frame):
             win.Bind(wx.EVT_SHOW, None)
 
         self.Bind(wx.EVT_SHOW, sizeFix)
+        # do this last to catch errors on the CLI
+        if not cli_args or not cli_args.no_redirect:
+            sys.stderr = WriteRedirect(self.debugWindow.stderr)
+
+    def onClose(self, evt):
+        print('on close')
+        self.worker.stopScan()
+        print('scan stopped')
+        self.Destroy()
+
+    def onAbout(self, evt):
+        print('about')
+    
+    def onDebugWindowToggle(self, evt):
+
+        if self.debugWindowItem.IsChecked():
+            self.debugWindow.Show()
+        else:
+            self.debugWindow.Hide()
+
+    def onDebugWindowClose(self, evt):
+        self.debugWindow.Hide()
+        self.debugWindowItem.Check(False)
+
+    def onQuit(self, evt):
+        self.Close()
 
     def chooseSerialPort(self):
         with SerialPortDialog(None, port = self.j.serial.port) as d:
@@ -1139,23 +1215,18 @@ class Main(wx.Frame):
                 return serial.Serial(p.device)
         if ports: return serial.Serial(ports[0].device)
         return serial.Serial()
-        
 
-    def readInfo(self):
-        if not self.accessLock.acquire(timeout=0):
+    def onScanData(self, evt):
+
+        if hasattr(evt, 'err'):
+            print(''.join(traceback.format_tb(evt.err.__traceback__)), file = sys.stderr)
+            self.setStatus('Scan Error')
             return
-        try:
-            basicInfo = self.j.readBasicInfo()
-            cellInfo = self.j.readCellInfo()
-            deviceInfo = self.j.readDeviceInfo()
-        finally:
-            self.accessLock.release()
-            
-        temps = [v for k,v in basicInfo.items() if self.ntc_RE.match(k) and v is not None]
-        bals  = [v for k,v in basicInfo.items() if k.startswith('bal') and v is not None]
-        volts = [v for v in cellInfo.values() if v is not None]
-        
         # Populate cell grid
+        temps = [v for k,v in evt.basicInfo.items() if self.ntc_RE.match(k) and v is not None]
+        bals  = [v for k,v in evt.basicInfo.items() if k.startswith('bal') and v is not None]
+        volts = [v for v in evt.cellInfo.values() if v is not None]
+        
         grid = self.FindWindowByName('info_cell_grid')
         gridRowsNeeded = max(len(volts), len(temps))
         gridRowsCurrent = grid.GetNumberRows()
@@ -1169,45 +1240,48 @@ class Main(wx.Frame):
             grid.SetCellValue(i, 2, 'BAL' if i < len(bals) and bals[i] else '--')
             grid.SetCellValue(i, 3, str(temps[i]) if i < len(temps) else '')
 
-
         cell_max_mv = max(volts)
         cell_min_mv = min(volts)
         cell_delta_mv = cell_max_mv - cell_min_mv
-        self.set('info_pack_mv', basicInfo['pack_mv'])
-        self.set('info_pack_ma', basicInfo['pack_ma'])
+        self.set('info_pack_mv', evt.basicInfo['pack_mv'])
+        self.set('info_pack_ma', evt.basicInfo['pack_ma'])
         self.set('info_cell_avg_mv', sum(volts) // len(volts))
         self.set('info_cell_max_mv', cell_max_mv)
         self.set('info_cell_min_mv', cell_min_mv)
         self.set('info_cell_delta_mv', cell_delta_mv)
-        self.set('info_cycle_cnt', basicInfo['cycle_cnt'])
-        self.set('info_design_cap', basicInfo['design_cap'])
-        self.set('info_cycle_cap', basicInfo['cycle_cap'])
-        self.set('info_cap_pct', basicInfo['cap_pct'])
+        self.set('info_cycle_cnt', evt.basicInfo['cycle_cnt'])
+        self.set('info_design_cap', evt.basicInfo['design_cap'])
+        self.set('info_cycle_cap', evt.basicInfo['cycle_cap'])
+        self.set('info_cap_pct', evt.basicInfo['cap_pct'])
 
-        self.set('info_device_name', deviceInfo['device_name'])
-        date = f"{basicInfo['year']}-{basicInfo['month']}-{basicInfo['day']}"
+        self.set('info_device_name', evt.deviceInfo['device_name'])
+        date = f"{evt.basicInfo['year']}-{evt.basicInfo['month']}-{evt.basicInfo['day']}"
         self.set('info_mfg_date', date)
-        self.set('info_version', f"0x{basicInfo['version']:02X}")
+        self.set('info_version', f"0x{evt.basicInfo['version']:02X}")
 
-        cfe = basicInfo['chg_fet_en']
-        dfe = basicInfo['dsg_fet_en']
+        cfe = evt.basicInfo['chg_fet_en']
+        dfe = evt.basicInfo['dsg_fet_en']
         self.set('info_chg_fet_status_txt', 'ENABLED' if cfe else 'DISABLED')
         self.set('info_dsg_fet_status_txt', 'ENABLED' if dfe else 'DISABLED')
         self.set('info_chg_fet_status_img', cfe)
         self.set('info_dsg_fet_status_img', dfe)
 
-        err_fn = [i for i in basicInfo.keys() if i.endswith('_err')]
+        err_fn = [i for i in evt.basicInfo.keys() if i.endswith('_err')]
         for f in err_fn:
-            self.set('info_' + f,basicInfo[f])
+            self.set('info_' + f,evt.basicInfo[f])
 
     def onProgress(self, evt):
-        self.GetStatusBar().SetValue(evt.value)
+        self.progressGauge.SetValue(evt.value)
 
     def onEepromDone(self, evt):
         self.accessLock.release()
+        self.settingsTab.Enable(True)
+        self.worker.join()
         if isinstance(evt.data, Exception):
             traceback.print_tb(evt.data.__traceback__)
-            print(f'eeprom error: {repr(evt.data)}')
+            print(f'eeprom error: {repr(evt.data)}', file=sys.stderr)
+            if isinstance(evt.data, jbd.BMSError):
+                wx.LogError(f'Unable to communicate with BMS')
         elif evt.data is not None:
             self.scatterEeprom(evt.data)
         else:
@@ -1278,31 +1352,32 @@ class Main(wx.Frame):
         elif n == 'clear_errors_btn':
             self.clearErrors()
         elif n == 'start_stop_btn':
-            self.startStop()
+            self.startStopScan()
         else:
             print(f'unknown button {n}')
 
-    def startStop(self):
-        if self.scanTimer.IsRunning():
-            self.scanTimer.Stop()
+    def startStopScan(self):
+        if self.worker.scanRunning:
+            self.startStopButton.Enable(False)
+            self.worker.stopScan()
             self.startStopButton.SetLabel('Start')
+            self.startStopButton.Enable(True)
         else:
-            self.scanTimer.Start(3000)
+            self.startStopButton.Enable(False)
+            self.worker.startScan()
             self.startStopButton.SetLabel('Stop')
-
-    def onScanTimer(self, evt):
-        print('scan')
-        self.readInfo()
+            self.startStopButton.Enable(True)
 
     def readEeprom(self):
         self.accessLock.acquire()
-        worker = EepromWorker(self, self.j)
-        worker.run(worker.readEeprom)
+        self.settingsTab.Enable(False)
+        self.worker.runOnce(self.worker.readEepromWorker)
 
     def writeEeprom(self):
         data = self.gatherEeprom()
-        worker = EepromWorker(self, self.j)
-        worker.run(worker.writeEeprom, data)
+        self.accessLock.acquire()
+        self.settingsTab.Enable(False)
+        self.worker.runOnce(self.worker.writeEepromWorker, data)
 
     def loadEeprom(self):
         with wx.FileDialog(self, 'Load EEPROM', wildcard='Data files (*.fig)|*.fig',
@@ -1339,21 +1414,26 @@ class Main(wx.Frame):
                 self.setStatus('BMS comm error')
 
     def setStatus(self, t):
-        self.GetStatusBar().SetStatusText(t)
+        self.statusText.SetLabel(t)
+        self.Layout()
 
-class EepromWorker:
+class BkgWorker:
     EepProg, EVT_EEP_PROG = wx.lib.newevent.NewEvent()
     EepDone, EVT_EEP_DONE = wx.lib.newevent.NewEvent()
+    ScanData, EVT_SCAN_DATA = wx.lib.newevent.NewEvent()
 
     def __init__(self, parent, jbd):
         self.parent = parent
         self.j = jbd
-        self.thr = None
+        self.eeprom_thread = None
+        self.scan_thread = None
+        self.scan_run = False
+        self.scan_delay = 3
 
     def progress(self, value):
         wx.PostEvent(self.parent, self.EepProg(value = value))
 
-    def readEeprom(self):
+    def readEepromWorker(self):
         try:
             data = self.j.readEeprom(self.progress)
             wx.PostEvent(self.parent, self.EepDone(data = data))
@@ -1362,7 +1442,7 @@ class EepromWorker:
         finally:
             wx.PostEvent(self.parent, self.EepProg(value = 100))
 
-    def writeEeprom(self, data):
+    def writeEepromWorker(self, data):
         try:
             self.j.writeEeprom(data, self.progress)
             wx.PostEvent(self.parent, self.EepDone(data = None))
@@ -1371,29 +1451,80 @@ class EepromWorker:
         finally:
             wx.PostEvent(self.parent, self.EepProg(value = 100))
 
-    def run(self, func, *args, **kwargs):
-        self.thr = threading.Thread(target = func, args = args, kwargs = kwargs)
-        self.thr.start()
+    def runOnce(self, func, *args, **kwargs):
+        if self.eeprom_thread: return
+        self.eeprom_thread = threading.Thread(target = func, args = args, kwargs = kwargs)
+        self.eeprom_thread.start()
+
+    @property
+    def scanRunning(self):
+        return bool(self.scan_thread)
+
+    def scanWorker(self):
+        print('scan worker start')
+        try:
+            while True:
+                if self.parent.accessLock.acquire(timeout=0):
+                    try:
+                        basicInfo = self.j.readBasicInfo()
+                        cellInfo = self.j.readCellInfo()
+                        deviceInfo = self.j.readDeviceInfo()
+                        wx.PostEvent(self.parent, self.ScanData(basicInfo = basicInfo, cellInfo = cellInfo, deviceInfo = deviceInfo))
+                        print('Scan complete')
+                    except Exception as e:
+                        wx.PostEvent(self.parent, self.ScanData(err = e))
+                    finally:
+                        self.parent.accessLock.release()
+                else:
+                    print('skip scan, device is busy')
+
+                slice = 5
+                for i in range(self.scan_delay * slice):
+                    if not self.scan_run: raise StopIteration()
+                    time.sleep(1 / slice)
+        except StopIteration: pass
+        print('scan worker finished')
+    
+    def startScan(self):
+        if self.scan_thread: return
+        self.scan_thread = threading.Thread(target = self.scanWorker)
+        self.scan_run = True
+        self.scan_thread.start()
+
+    def stopScan(self):
+        if not self.scan_thread: return
+        self.scan_run = False
+        self.scan_thread.join(3)
+        ret = not self.scan_thread.is_alive()
+        self.scan_thread = None
+        return ret
 
     def join(self):
-        if not thr: return True
-        thr.join(1)
-        return not thr.is_alive()
-
-
-
+        if not self.eeprom_thread: return True
+        self.eeprom_thread.join(1)
+        ret = not self.eeprom_thread.is_alive()
+        self.eeprom_thread = None
     
-class MyApp(wx.App):
+class JBDApp(wx.App):
+    def __init__(self, *args, **kwargs):
+        self.cli_args = kwargs.pop('cli_args', None)
+        super().__init__(*args, **kwargs)
+
     def OnInit(self):
         configAppName = appName.lower().replace(' ','_') 
         self.SetAppName(configAppName)
         self.SetAppDisplayName(appName)
 
-        frame = Main(None, title = f'{appName} {appVersion}',style = wx.DEFAULT_FRAME_STYLE | wx.WS_EX_VALIDATE_RECURSIVELY )
-        frame.SetIcon(wx.Icon(os.path.join(base_path, 'img', 'batt_icon_128.ico')))
+        icon = wx.Icon(os.path.join(base_path, 'img', 'batt_icon_128.ico'))
+        frame = Main(None, title = appNameWithVersion, style = wx.DEFAULT_FRAME_STYLE | wx.WS_EX_VALIDATE_RECURSIVELY, icon = icon, cli_args = self.cli_args)
         frame.Show()
         return True
 
 if __name__ == "__main__":
-    app = MyApp()
+    import argparse
+    p = argparse.ArgumentParser()
+    p.add_argument('-n', '--no-redirect', action='store_true')
+    cli_args = p.parse_args()
+
+    app = JBDApp(cli_args = cli_args)
     app.MainLoop()
