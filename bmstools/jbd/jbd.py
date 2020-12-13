@@ -25,7 +25,7 @@ class JBD:
     READ            = 0xA5
     WRITE           = 0x5A
 
-    def __init__(self, s, timeout = 3, debug = False):
+    def __init__(self, s, timeout = 1, debug = False):
         self.s = s
         try:
             self.s.close()
