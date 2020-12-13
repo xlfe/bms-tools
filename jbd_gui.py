@@ -137,11 +137,23 @@ class TextFrame(wx.Frame):
 
     write = stdout
 
+
+# we have to do all this convoluted writing
+# via events else `print` statements from 
+# background threads will clog up the works.
+
+class TextDataType(enum.Enum):
+    STDOUT = 1
+    STDERR = 2
+
 class WriteRedirect:
-    def __init__(self, func):
-        self.func = func
+    TextEvent, EVT_TEXT = wx.lib.newevent.NewEvent()
+    def __init__(self, parent, type):
+        self.parent = parent
+        self.type = type
+
     def write(self, text):
-        self.func(text)
+        wx.PostEvent(self.parent, self.TextEvent(text = text, type = self.type))
 
     def flush(self): pass
 
@@ -1052,18 +1064,24 @@ class Main(wx.Frame):
         cli_args = kwargs.pop('cli_args', None)
         kwargs['style'] = wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX)
         wx.Frame.__init__(self, *args, **kwargs)
+        self.sys_stdout = sys.stdout
+        self.sys_stderr = sys.stderr
 
 
         # debug window
         self.debugWindow = TextFrame(self, title=f'{appName} debug window')
         self.Bind(TextFrame.EVT_TEXTFRAME_CLOSE, self.onDebugWindowClose)
+        if cli_args and cli_args.open_debug:
+            self.debugWindow.Show()
 
         if icon: 
             self.SetIcon(icon)
             self.debugWindow.SetIcon(icon)
 
         if not cli_args or not cli_args.no_redirect:
-            sys.stdout = WriteRedirect(self.debugWindow.stdout)
+            sys.stdout = WriteRedirect(self, TextDataType.STDOUT)
+            
+        self.Bind(WriteRedirect.EVT_TEXT, self.onText)
         print(f'Welcome to {appNameWithVersion}\n')
 
         port = self.getLastSerialPort()
@@ -1165,15 +1183,23 @@ class Main(wx.Frame):
             win.Bind(wx.EVT_SHOW, None)
 
         self.Bind(wx.EVT_SHOW, sizeFix)
+
         # do this last to catch errors on the CLI
         if not cli_args or not cli_args.no_redirect:
-            sys.stderr = WriteRedirect(self.debugWindow.stderr)
+            sys.stderr = WriteRedirect(self, TextDataType.STDERR)
 
     def onClose(self, evt):
         print('on close')
         self.worker.stopScan()
         print('scan stopped')
         self.Destroy()
+
+    def onText(self, evt):
+        if evt.type == TextDataType.STDOUT:
+            self.debugWindow.stdout(evt.text)
+        elif evt.type == TextDataType.STDERR:
+            self.debugWindow.stderr(evt.text)
+        #self.sys_stdout.write(evt.text)
 
     def onAbout(self, evt):
         print('about')
@@ -1222,6 +1248,10 @@ class Main(wx.Frame):
             print(''.join(traceback.format_tb(evt.err.__traceback__)), file = sys.stderr)
             self.setStatus('Scan Error')
             return
+
+        #sometimes we get data after stopping ...
+        if self.worker.scanRunning:
+            self.progressGauge.Pulse()
         # Populate cell grid
         temps = [v for k,v in evt.basicInfo.items() if self.ntc_RE.match(k) and v is not None]
         bals  = [v for k,v in evt.basicInfo.items() if k.startswith('bal') and v is not None]
@@ -1362,6 +1392,7 @@ class Main(wx.Frame):
             self.worker.stopScan()
             self.startStopButton.SetLabel('Start')
             self.startStopButton.Enable(True)
+            self.progressGauge.SetValue(0)
         else:
             self.startStopButton.Enable(False)
             self.worker.startScan()
@@ -1461,8 +1492,8 @@ class BkgWorker:
         return bool(self.scan_thread)
 
     def scanWorker(self):
-        print('scan worker start')
         try:
+            print('scan start')
             while True:
                 if self.parent.accessLock.acquire(timeout=0):
                     try:
@@ -1470,20 +1501,22 @@ class BkgWorker:
                         cellInfo = self.j.readCellInfo()
                         deviceInfo = self.j.readDeviceInfo()
                         wx.PostEvent(self.parent, self.ScanData(basicInfo = basicInfo, cellInfo = cellInfo, deviceInfo = deviceInfo))
-                        print('Scan complete')
+                        print('scan complete')
                     except Exception as e:
                         wx.PostEvent(self.parent, self.ScanData(err = e))
                     finally:
                         self.parent.accessLock.release()
                 else:
-                    print('skip scan, device is busy')
+                    print('scan skipped -- BMS busy')
 
                 slice = 5
                 for i in range(self.scan_delay * slice):
-                    if not self.scan_run: raise StopIteration()
+                    #print(i)
+                    if not self.scan_run:
+                        return
                     time.sleep(1 / slice)
-        except StopIteration: pass
-        print('scan worker finished')
+        finally:
+            print('scan terminated')
     
     def startScan(self):
         if self.scan_thread: return
@@ -1524,6 +1557,7 @@ if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser()
     p.add_argument('-n', '--no-redirect', action='store_true')
+    p.add_argument('-o', '--open-debug', action='store_true')
     cli_args = p.parse_args()
 
     app = JBDApp(cli_args = cli_args)
