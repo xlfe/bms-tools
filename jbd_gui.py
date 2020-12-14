@@ -19,9 +19,14 @@ import wx.svg
 import wx.lib.scrolledpanel as scrolled
 import wx.lib.newevent
 import wx.lib.masked.numctrl
+import wx.html2
 
 appName = 'JBD BMS Tools'
 appVersion = '0.0.1-alpha'
+appUrl = 'https://gitlab.com/MrSurly/bms-tools'
+author = 'Eric Poulsen'
+authorEmail = 'eric@zyxod.com'
+authorFullEmail = '"Eric Poulsen" <eric@zyxod.com>'
 releaseDate = 'N/A'
 appNameWithVersion = f'{appName} {appVersion}'
 
@@ -157,7 +162,76 @@ class WriteRedirect:
 
     def flush(self): pass
 
+aboutHtml = f'''
+<html>
+<head></head>
+<body>
+<div id="main">
+<center>
+<font face="Verdana">
+{appName}<br>
+Version: {appVersion}<br>
+<hr>
+{author} &lt;<a href='mailto:{authorFullEmail}'>{authorEmail}</a>&gt;<br>
+<hr>
+<a href="{appUrl}" target="bmstools">{appUrl}</a>
+</font>
+</center>
+</div>
+</body>
+</html>
+'''
 
+class AboutDialog(wx.Dialog):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.SetTitle(f'About {appName}')
+        self.SetSize((700,700))
+
+        vbox = wx.BoxSizer(wx.VERTICAL)
+
+        if 0:
+            lines = [
+                appName,
+                appVersion,
+                '',
+                authorEmail, 
+                '',
+                appUrl
+            ]
+            t = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_AUTO_URL)
+            t.SetValue('\n'.join(lines))
+            vbox.Add(t, 1, wx.EXPAND)
+
+        if 1:
+            wx.html2.WebView.MSWSetEmulationLevel()
+            self.h = wx.html2.WebView.New(self)
+            self.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.onLoad, self.h)
+            self.h.SetPage(aboutHtml, '')
+            self.h.SetSize(500, 500)
+            vbox.Add(self.h, 1, wx.EXPAND, 10)
+
+        outer = wx.BoxSizer()
+        outer.Add(vbox, 1, wx.EXPAND | wx.ALL, 10)
+        self.SetSizerAndFit(outer)
+        self.SetSizer(outer)
+
+    def onLoad(self, evt):
+        try:
+            js = 'document.getElementById("main").scrollHeight'
+            height = int(self.h.RunScript(js)[1])
+            js = 'document.getElementById("main").scrollWidth'
+            width = int(self.h.RunScript(js)[1])
+        except: 
+            return
+        #self.h.SetSize(-1, -1, width * 3, height * 3, sizeFlags = wx.SIZE_FORCE)
+
+        w,h = self.h.GetSize()
+        print(w,h)
+
+        self.h.SetMinSize(wx.Size(400, height))
+        self.SetMinSize(wx.Size(width*2, height*2))
+        print(f'onload called: {width}x{height}')
 
 class SerialPortDialog(wx.Dialog):
 
@@ -1060,7 +1134,7 @@ class ChildIter:
 class Main(wx.Frame):
     ntc_RE = re.compile(r'ntc\d+')
     def __init__(self, *args, **kwargs):
-        icon = kwargs.pop('icon', None)
+        self.icon = kwargs.pop('icon', None)
         cli_args = kwargs.pop('cli_args', None)
         kwargs['style'] = wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX)
         wx.Frame.__init__(self, *args, **kwargs)
@@ -1074,9 +1148,9 @@ class Main(wx.Frame):
         if cli_args and cli_args.open_debug:
             self.debugWindow.Show()
 
-        if icon: 
-            self.SetIcon(icon)
-            self.debugWindow.SetIcon(icon)
+        if self.icon: 
+            self.SetIcon(self.icon)
+            self.debugWindow.SetIcon(self.icon)
 
         if not cli_args or not cli_args.no_redirect:
             sys.stdout = WriteRedirect(self, TextDataType.STDOUT)
@@ -1188,6 +1262,9 @@ class Main(wx.Frame):
         if not cli_args or not cli_args.no_redirect:
             sys.stderr = WriteRedirect(self, TextDataType.STDERR)
 
+    def onQuit(self, evt):
+        self.Close()
+
     def onClose(self, evt):
         print('on close')
         self.worker.stopScan()
@@ -1202,7 +1279,9 @@ class Main(wx.Frame):
         #self.sys_stdout.write(evt.text)
 
     def onAbout(self, evt):
-        print('about')
+        a = AboutDialog(self)
+        a.SetIcon(self.icon)
+        a.ShowModal()
     
     def onDebugWindowToggle(self, evt):
 
@@ -1214,9 +1293,6 @@ class Main(wx.Frame):
     def onDebugWindowClose(self, evt):
         self.debugWindow.Hide()
         self.debugWindowItem.Check(False)
-
-    def onQuit(self, evt):
-        self.Close()
 
     def chooseSerialPort(self):
         with SerialPortDialog(None, port = self.j.serial.port) as d:
@@ -1398,6 +1474,10 @@ class Main(wx.Frame):
             self.worker.startScan()
             self.startStopButton.SetLabel('Stop')
             self.startStopButton.Enable(True)
+            self.progressGauge.Pulse()
+
+    def setLogFile(self):
+        pass
 
     def readEeprom(self):
         self.accessLock.acquire()
