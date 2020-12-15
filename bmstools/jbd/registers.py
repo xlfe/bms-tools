@@ -158,14 +158,14 @@ class ErrorCountReg(ReadOnlyMixin, BaseReg):
 
     @property
     def valueNames(self):
-        return self._values.keys()
+        return list(self._values.keys())
     
     @property
     def unit(self):
         return int
 
     def __str__(self):
-        ', '.join(f'{k}: {v}' for k,v in self._values.items())
+        return f'{self._regName}: ' + ', '.join(f'{k}: {v}' for k,v in self._values.items())
     
     def get(self, valueName):
         return self._values[valueName]
@@ -202,7 +202,7 @@ class DelayReg(BaseReg):
 
     @property
     def valueNames(self):
-        return self._values.keys()
+        return list(self._values.keys())
 
     def unpack(self, payload):
         values = struct.unpack('>2B', payload)
@@ -221,7 +221,7 @@ class BitfieldReg(BaseReg):
 
     @property
     def valueNames(self):
-        return self._values.keys()
+        return list(self._values.keys())
         
     def get(self, valueName):
         return self._values[valueName]
@@ -246,6 +246,7 @@ class StringReg(BaseReg):
     def __init__(self, regName, adx, maxLen = 30):
         self._regName = regName
         self._adx = adx
+        self._value = ''
 
     @property
     def valueNames(self):
@@ -304,7 +305,7 @@ class DateReg(BaseReg):
         setattr(self, '_'+valueName, value)
 
     def __str__(self):
-        return f'{self.year}-{self.month}-{self.day}'
+        return f'{self._year}-{self._month}-{self._day}'
 
     def unpack(self, payload):
         value = struct.unpack('>H', payload)[0]
