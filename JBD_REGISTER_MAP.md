@@ -76,37 +76,49 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
      <th>Byte offset</th>
      <th>Data</td>
      <th>Format</th>
-     <th>Library field name(s)</th>
+     <th>Unit</th>
+     <th>Field name(s)</th>
+     <th>Notes</th>
     </tr>
     <tr>
      <td>0x0</td>
      <td>Pack voltage</td>
-     <td>U16, unit: 10mV </td>
+     <td>U16</td>
+     <td>10mV </td>
      <td>pack_mv</td>
+     <td></td>
     </tr>
     <tr>
      <td>0x2</td>
      <td>Pack amperes</td>
-     <td>S16, unit: 10mA, negative values are discharge</td>
+     <td>S16</td>
+     <td>10mA</td>
      <td>pack_ma</td>
+     <td>Negative values indicate discharge</td>
     </tr>
     <tr>
      <td>0x4</td>
      <td>Balance Capacity</td>
-     <td>U16, unit: 10mAH</td>
+     <td>U16</td>
+     <td>10mAH</td>
      <td>cycle_cap</td>
+     <td></td>
     </tr>
     <tr>
      <td>0x6</td>
      <td>Full Capacity</td>
-     <td>U16, unit: 10mAH</td>
+     <td>U16</td>
+     <td>10mAH</td>
      <td>design_cap</td>
+     <td></td>
     </tr>
     <tr>
      <td>0x8</td>
      <td>Discharge/Charge Cycles</td>
-     <td>U16, unit: 1 cycle</td>
+     <td>U16</td>
+     <td>1 cycle</td>
      <td>cycle_cnt</td>
+     <td></td>
     </tr>
     <tr>
      <td>0xA</td>
@@ -117,7 +129,9 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
         bits 8:5=month<br>
         bits 4:0=Day<br>
      </td>
+     <td>--</td>
      <td>year, month, day</td>
+     <td></td>
     </tr>
     <tr>
      <td>0xC</td>
@@ -126,7 +140,9 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
          bit 0: cell 1 balance active<br>
          bit 1: cell 2 balance active<br>
          ...etc...</td>
-     <td>bal_0, bal_1, &lt;etc&gt; </td>
+     <td>--</td>
+     <td>bal_0, bal_1, ... etc ...  </td>
+     <td></td>
     </tr>
     <tr>
      <td>0xE</td>
@@ -135,7 +151,9 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
          bit 0: cell 17 balance active<br>
          bit 1: cell 18 balance active<br>
          ...etc...</td>
+     <td>--</td>
      <td>bal_16, bal_17, &lt;etc&gt; </td>
+     <td></td>
     </tr>
     <tr>
      <td>0x10</td>
@@ -155,44 +173,58 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
          bit 11: Frontend IC error<br>
          bit 12: Charge or Discharge FET locked by config (See register 0x1e "MOS CTRL")<br>
         </td>
+     <td>--</td>
      <td> covp_err, cuvp_err, povp_err, puvp_err, chgot_err, chgut_err, dsgot_err, dsgut_err, chgoc_err, dsgoc_err, sc_err, afe_err, software_err</td>
+     <td></td>
     </tr>
     <tr>
      <td>0x11</td>
      <td>Software Version</td>
      <td>1 byte: 0x10 = 1.0 (BCD?)</td>
-     <td>version</td>Kelvin / 10>
+     <td>--</td>
+     <td>version</td>
+     <td></td>
     <tr>
      <td>0x12</td>
      <td>State of Charge</td>
-     <td>1 byte: 0-100, percent</td>
+     <td>1 byte</td>
+     <td>percent</td>
      <td>cap_pct</td>
+     <td></td>
     </tr>
     <tr>
      <td>0x13</td>
      <td>FET status</td>
-     <td>1 byte: <br>
+     <td>1 byte</td>
+     <td>
          bit 0: charge FET <br>
          bit 1: discharge FET<br>
-         bit set = FET is conducting</td>
+         bit set = FET is conducting
+     </td>
      <td>chg_fet_en, dsg_fet_en</td>
+     <td></td>
     </tr>
     <tr>
      <td>0x14</td>
      <td>Pack cells</td>
-     <td>1 byte: number of series cells in pack</td>
+     <td>1 byte</td>
+     <td>1 cell</td>
      <td>cell_cnt</td>
+     <td></td>
     </tr>
     <tr>
      <td>0x15</td>
      <td>NTC count</td>
-     <td>1 byte: number of thermistors</td>
+     <td>1 byte</td>
+     <td>1 NTC</td>
      <td>ntc_cnt</td>
+     <t>></td>
     </tr>
     <tr>
      <td>0x16 .. 0x16 + ntc_cnt x 2</td>
      <td>NTC Values</td>
-     <td>16 bits, unsigned, unit 0.1K</td>
+     <td>16 bits</td>
+     <td>0.1K</td>
      <td>ntc0, ntc1, &lt;etc&gt;</td>
     </tr>
 </table>
@@ -228,7 +260,7 @@ The number of values returned depends on the cell_cnt field from 0x3 "Basic Info
      <td>0x0</td>
      <td>Device name length</td>
      <td>1 byte, length of following string</td>
-     <td>&lt;N/A&gt;</td>
+     <td>--</td>
     </tr>
     <tr>
      <td>0x1 .. n</td>
