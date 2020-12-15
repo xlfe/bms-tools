@@ -9,7 +9,7 @@
     </tr>
     <tr>
         <td>U16</td>
-        <td>Unsigned value</td>
+        <td>Unsigned 16 bit value</td>
     </tr>
     <tr>
         <td>S16</td>
