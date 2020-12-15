@@ -190,7 +190,7 @@ class AboutDialog(wx.Dialog):
 
         vbox = wx.BoxSizer(wx.VERTICAL)
 
-        if 0:
+        if 1:
             lines = [
                 appName,
                 appVersion,
@@ -199,22 +199,16 @@ class AboutDialog(wx.Dialog):
                 '',
                 appUrl
             ]
-            t = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_AUTO_URL)
+            t = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_AUTO_URL, size = (200,200))
             t.SetValue('\n'.join(lines))
             vbox.Add(t, 1, wx.EXPAND)
 
-        if 1:
-            wx.html2.WebView.MSWSetEmulationLevel()
-            self.h = wx.html2.WebView.New(self)
-            self.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.onLoad, self.h)
-            self.h.SetPage(aboutHtml, '')
-            self.h.SetSize(500, 500)
-            vbox.Add(self.h, 1, wx.EXPAND, 10)
+        if 0:
+            outer = wx.BoxSizer()
+            outer.Add(vbox, 1, wx.EXPAND | wx.ALL, 10)
 
-        outer = wx.BoxSizer()
-        outer.Add(vbox, 1, wx.EXPAND | wx.ALL, 10)
-        self.SetSizerAndFit(outer)
-        self.SetSizer(outer)
+        self.SetSizerAndFit(vbox)
+        #self.SetSizer(outer)
 
     def onLoad(self, evt):
         try:
@@ -999,7 +993,61 @@ class LayoutGen:
         fgs.AddMany(gen('SC',    'sc_err_cnt'))
         fgs.Add(wx.Button(sb, label='Clear', name='clear_errors_btn'))
 
+    ####
+    ##### Calibration tab methods 
+    ####
 
+    def calTabLayout(self, tab):
+        vsizer  = wx.BoxSizer(wx.VERTICAL)
+        tab.SetSizer(vsizer)
+        self.voltCalLayout(tab, vsizer, colGap, boxGap)
+
+        tab.Layout()
+        tab.Fit()
+
+    def voltCalLayout(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+        sizer.Add(panel, 0, *defaultBorder)
+
+        sb = wx.StaticBox(panel, label='Voltage and Temperature Calibration')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        panel.SetSizer(sbs)
+
+        gbs = wx.GridBagSizer(5,5)
+        sbs.Add(gbs, 1, *defaultBorder)
+
+        def gen_cell(index):
+            cell_label = wx.StaticText(sb, label=f'Cell {index + 1}')
+            cell_read = wx.TextCtrl(sb, value='0', name=f'cell_read{i}', size=self.txtSize4)
+            cell_act = wx.TextCtrl(sb, value='', name=f'cell_act{i}', size=self.txtSize4)
+            cell_read.Enable(False)
+            return cell_label, cell_read, cell_act
+
+        def gen_ntc(index):
+            ntc_label = wx.StaticText(sb, label=f'NTC {index + 1}')
+            ntc_read = wx.TextCtrl(sb, value='0', name=f'ntc_read{i}', size=self.txtSize4)
+            ntc_act = wx.TextCtrl(sb, value='', name=f'ntc_act{i}', size=self.txtSize4)
+            ntc_read.Enable(False)
+            return ntc_label, ntc_read, ntc_act
+
+
+        for i in range(32):
+            col = i // 8 * 4
+            row = i % 8
+            for j, item in enumerate(gen_cell(i)):
+                gbs.Add(item, wx.GBPosition(row, col + j), flag = wx.ALIGN_CENTER_VERTICAL)
+
+        for i in range(8):
+            col = 17 
+            row = i
+            for j, item in enumerate(gen_ntc(i)):
+                gbs.Add(item, wx.GBPosition(row, col + j), flag = wx.ALIGN_CENTER_VERTICAL)
+        
+        for i in range(4):
+            gbs.AddGrowableCol((i+1) * 4 - 1)
+
+
+ 
 class RoundGauge(wx.Panel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1188,12 +1236,15 @@ class Main(wx.Frame):
         nb = wx.Notebook(nb_panel)
         self.infoTab = wx.Panel(nb)
         self.settingsTab = wx.Panel(nb)
+        self.calTab = wx.Panel(nb)
 
         layout.infoTabLayout(self.infoTab)
         layout.settingsTabLayout(self.settingsTab)
+        layout.calTabLayout(self.calTab)
 
         nb.AddPage(self.infoTab, 'Info')
         nb.AddPage(self.settingsTab, 'Settings')
+        nb.AddPage(self.calTab, 'Calibration')
 
         for c in ChildIter.iterNamed(self.settingsTab):
             c.Name = 'eeprom_' + c.Name
@@ -1539,7 +1590,7 @@ class BkgWorker:
         self.eeprom_thread = None
         self.scan_thread = None
         self.scan_run = False
-        self.scan_delay = 3
+        self.scan_delay = 1
 
     def progress(self, value):
         wx.PostEvent(self.parent, self.EepProg(value = value))
@@ -1575,6 +1626,7 @@ class BkgWorker:
         try:
             print('scan start')
             while True:
+                then = time.time()
                 if self.parent.accessLock.acquire(timeout=0):
                     try:
                         basicInfo = self.j.readBasicInfo()
@@ -1589,12 +1641,20 @@ class BkgWorker:
                 else:
                     print('scan skipped -- BMS busy')
 
-                slice = 5
-                for i in range(self.scan_delay * slice):
-                    #print(i)
-                    if not self.scan_run:
-                        return
-                    time.sleep(1 / slice)
+                # attempt to compensate for read time
+                elapsed = time.time() - then
+                delay = self.scan_delay - elapsed
+
+                if delay > .2:
+                    cnt = int(delay //.2)
+                    slp = delay / cnt
+                else:
+                    cnt = 1
+                    slp = delay
+
+                for i in range(cnt):
+                    if not self.scan_run: return
+                    time.sleep(slp)
         finally:
             print('scan terminated')
     
