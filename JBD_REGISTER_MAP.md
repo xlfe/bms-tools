@@ -939,8 +939,8 @@ Write the byte sequence 0x28, 0x28 to exit "Factory Mode," update the values in 
      <td>MOSFET control</td>
      <td>
         U16:<br>
-        &nbsp;bit 0: Set to disable charge FET
-        &nbsp;bit 1: Set to disable discharge FET
+        &nbsp;bit 0: Set to disable charge FET<br>
+        &nbsp;bit 1: Set to disable discharge FET<br>
      </td>
      <td>--</td>
      <td></td>
