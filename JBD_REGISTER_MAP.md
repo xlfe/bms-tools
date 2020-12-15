@@ -8,12 +8,12 @@
         <th>Meaning</th>
     </tr>
     <tr>
-        <tr>U16</tr>
-        <tr>Unsigned value</tr>
+        <td>U16</td>
+        <td>Unsigned value</td>
     </tr>
     <tr>
-        <tr>S16</tr>
-        <tr>Signed 16 bit value</tr>
+        <td>S16</td>
+        <td>Signed 16 bit value</td>
     </tr>
 </table>
 
