@@ -218,7 +218,7 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
      <td>1 byte</td>
      <td>1 NTC</td>
      <td>ntc_cnt</td>
-     <t>></td>
+     <td></td>
     </tr>
     <tr>
      <td>0x16 .. 0x16 + ntc_cnt x 2</td>
