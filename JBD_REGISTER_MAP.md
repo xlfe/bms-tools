@@ -283,7 +283,7 @@ Write the byte sequence 0x56, 0x78 to enter "Factory Mode."  In this mode, the o
 #### Register 0x01 "Exit factory Mode"
 Write the byte sequence 0x0, 0x0 to exit "Factory Mode," and update the values in the EEPROM.
 
-Write the byte sequence 0x28, 0x28 to exit "Factory Mode," update the values in the EEROM, and reset the "Error Counts" register to zeroes.
+Write the byte sequence 0x28, 0x28 to exit "Factory Mode," update the values in the EEROM, and reset the "Error Counts" (0xAA) register to zeroes.
 
 #### Stored registers:
 <table border="1">
