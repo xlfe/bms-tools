@@ -35,10 +35,10 @@ Packets to/from the BMS consist of:
      <th>End Byte</th>
     </tr>
     <tr>
-     <td>`0xDD`</td>
+     <td>0xDD</td>
      <td>3 or more bytes</td>
      <td>2 bytes, U16</td>
-     <td>`0x77`</td>
+     <td>0x77</td>
 </table>
 <br>
 
@@ -50,7 +50,7 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
 
 <table border="1">
     <tr>
-     <td>Command byte: Read: `0x5A`, Write: `0xA5`</th>
+     <td>Command byte: Read: 0x5A, Write: 0xA5</th>
      <td>Register Address Byte</th>
      <td>Data length byte</th>
      <td>Data bytes, n = data le/ngth byte</th>
@@ -62,7 +62,7 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
 <table border="1">
     <tr>
      <td>Register Address Byte</td>
-     <td>Command status: OK: `0x0`, Error: `0x80` </td>
+     <td>Command status: OK: 0x0, Error: 0x80 </td>
      <td>Data length byte</td>
      <td>Data bytes, n = data length byte</td>
     </tr>
@@ -153,7 +153,7 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
          bit 9: Discharge overcurrent<br>
          bit 10: Short Circuit<br>
          bit 11: Frontend IC error<br>
-         bit 12: Charge or Discharge FET locked by config (See register `0x1e` "MOS CTRL")<br>
+         bit 12: Charge or Discharge FET locked by config (See register 0x1e "MOS CTRL")<br>
         </td>
      <td> covp_err, cuvp_err, povp_err, puvp_err, chgot_err, chgut_err, dsgot_err, dsgut_err, chgoc_err, dsgoc_err, sc_err, afe_err, software_err</td>
     </tr>
@@ -199,7 +199,7 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
 
 
 #### Register 0x04 "Cell voltages" (READ ONLY)
-The number of values returned depends on the `cell_cnt` field from 0x3 "Basic Info".
+The number of values returned depends on the cell_cnt field from 0x3 "Basic Info".
 <table border="1">
     <tr>
      <th>Byte offset</th>
@@ -216,7 +216,7 @@ The number of values returned depends on the `cell_cnt` field from 0x3 "Basic In
 </table>
 
 #### Register 0x05 "Device Name" (READ ONLY)
-The number of values returned depends on the `cell_cnt` field from 0x3 "Basic Info".
+The number of values returned depends on the cell_cnt field from 0x3 "Basic Info".
 <table border="1">
     <tr>
      <th>Byte offset</th>
@@ -658,7 +658,7 @@ Write the byte sequence 0x28, 0x28 to exit "Factory Mode," update the values in 
      <td> -- </td>
      <td>switch, scrl, balance_en, chg_balance_en, led_en, led_num</td>
      <td>
-        switch: Assume this enables the `sw` connector on the board?<br>
+        switch: Assume this enables the sw connector on the board?<br>
         scrl: ?<br>
         balance_en: Enable cell balancing<br>
         chg_balance_en: Enable balancing during charge (balance_en must also be on)<br>
