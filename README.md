@@ -27,7 +27,8 @@ Planned:
 
 ### GUI Build
 
-The GUI build uses [pyinstaller](https://www.lithiumbatterypcb.com/), and as such can only build an executable for the OS type it's built on; no cross-compilation.
+While the GUI itself is wxpython and doesn't technically _need_ to be built, but for distribution 
+ [pyinstaller](https://www.pyinstaller.org/) is used to build a distributable executable.
 
 1. `pip install .[gui]`
 1. make
