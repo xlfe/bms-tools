@@ -107,7 +107,7 @@ ranges = {
     'shunt_res':    (0.0, 6553.5, .1),
 }
 
-class TextFrame(wx.Frame):
+class DebugWindow(wx.Frame):
     CloseEvent, EVT_TEXTFRAME_CLOSE = wx.lib.newevent.NewEvent()
 
     def __init__(self, *args, **kwargs):
@@ -139,9 +139,9 @@ class TextFrame(wx.Frame):
     def stderr(self, text):
         self.txt.SetDefaultStyle(self.errStyle)
         self.txt.write(text)
+        self.Show()
 
     write = stdout
-
 
 # we have to do all this convoluted writing
 # via events else `print` statements from 
@@ -161,26 +161,6 @@ class WriteRedirect:
         wx.PostEvent(self.parent, self.TextEvent(text = text, type = self.type))
 
     def flush(self): pass
-
-aboutHtml = f'''
-<html>
-<head></head>
-<body>
-<div id="main">
-<center>
-<font face="Verdana">
-{appName}<br>
-Version: {appVersion}<br>
-<hr>
-{author} &lt;<a href='mailto:{authorFullEmail}'>{authorEmail}</a>&gt;<br>
-<hr>
-<a href="{appUrl}" target="bmstools">{appUrl}</a>
-</font>
-</center>
-</div>
-</body>
-</html>
-'''
 
 class AboutDialog(wx.Dialog):
     def __init__(self, *args, **kwargs):
@@ -1189,10 +1169,9 @@ class Main(wx.Frame):
         self.sys_stdout = sys.stdout
         self.sys_stderr = sys.stderr
 
-
         # debug window
-        self.debugWindow = TextFrame(self, title=f'{appName} debug window')
-        self.Bind(TextFrame.EVT_TEXTFRAME_CLOSE, self.onDebugWindowClose)
+        self.debugWindow = DebugWindow(self, title=f'{appName} debug window')
+        self.Bind(DebugWindow.EVT_TEXTFRAME_CLOSE, self.onDebugWindowClose)
         if cli_args and cli_args.open_debug:
             self.debugWindow.Show()
 
@@ -1221,12 +1200,14 @@ class Main(wx.Frame):
         self.fileMenu = wx.Menu()
         self.debugWindowItem = self.fileMenu.Append(wx.ID_ANY, 'Debug Window', 'Show debug window', kind = wx.ITEM_CHECK)
         self.aboutItem = self.fileMenu.Append(wx.ID_ABOUT, 'About', f'About {appName}')
+        self.websiteItem = self.fileMenu.Append(wx.ID_ANY, f'{appName} website', f'{appName} website')
         self.quitItem = self.fileMenu.Append(wx.ID_ANY, 'Quit')
         self.menuBar.Append(self.fileMenu, '&File')
         self.SetMenuBar(self.menuBar)
+        self.Bind(wx.EVT_MENU, self.onDebugWindowToggle, self.debugWindowItem)
+        self.Bind(wx.EVT_MENU, self.onWebsite, self.websiteItem)
         self.Bind(wx.EVT_MENU, self.onAbout, self.aboutItem)
         self.Bind(wx.EVT_MENU, self.onQuit, self.quitItem)
-        self.Bind(wx.EVT_MENU, self.onDebugWindowToggle, self.debugWindowItem)
 
         layout = LayoutGen(self)
 
@@ -1333,6 +1314,12 @@ class Main(wx.Frame):
         a = AboutDialog(self)
         a.SetIcon(self.icon)
         a.ShowModal()
+
+    def onWebsite(self, evt):
+        wx.BeginBusyCursor()
+        import webbrowser
+        webbrowser.open(appUrl)
+        wx.EndBusyCursor() 
     
     def onDebugWindowToggle(self, evt):
 
@@ -1550,6 +1537,7 @@ class Main(wx.Frame):
                 data = self.j.loadEepromFile(fn)
                 self.scatterEeprom(data)
             except:
+                traceback.print_exc()
                 wx.LogError('Cannot open file "{fn}".')
 
     def saveEeprom(self):
@@ -1562,6 +1550,7 @@ class Main(wx.Frame):
                 data = self.gatherEeprom()
                 self.j.saveEepromFile(fn, data)
             except:
+                traceback.print_exc()
                 wx.LogError(f'Cannot save current data in file "{fn}".')
 
     def clearErrors(self):
@@ -1677,7 +1666,20 @@ class BkgWorker:
         self.eeprom_thread.join(1)
         ret = not self.eeprom_thread.is_alive()
         self.eeprom_thread = None
-    
+
+warningMsg = f'''Hi,
+
+Thanks for trying out {appName}. 
+This is an alpha version, and 
+may contain bugs.  If you encounter
+any problems, please file an issue 
+by selecting "{appName} website" 
+from the File menu, and then 
+selecting the "Issues" tab.
+
+Thanks.
+
+-- Eric'''
 class JBDApp(wx.App):
     def __init__(self, *args, **kwargs):
         self.cli_args = kwargs.pop('cli_args', None)
@@ -1689,8 +1691,13 @@ class JBDApp(wx.App):
         self.SetAppDisplayName(appName)
 
         icon = wx.Icon(os.path.join(base_path, 'img', 'batt_icon_128.ico'))
-        frame = Main(None, title = appNameWithVersion, style = wx.DEFAULT_FRAME_STYLE | wx.WS_EX_VALIDATE_RECURSIVELY, icon = icon, cli_args = self.cli_args)
-        frame.Show()
+        main = Main(None, title = appNameWithVersion, style = wx.DEFAULT_FRAME_STYLE | wx.WS_EX_VALIDATE_RECURSIVELY, icon = icon, cli_args = self.cli_args)
+        main.Show()
+
+        # startup warning
+        d = wx.MessageDialog(None, warningMsg)
+        d.ShowModal()
+
         return True
 
 if __name__ == "__main__":
