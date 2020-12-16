@@ -102,6 +102,6 @@ class JBDPersist:
                 spacer = ' ' * (23 - len(fieldName))
             else:
                 spacer = ' ' * 8
-            lines.append(f'  {fieldName}{spacer}{parser.encode(values)}')
+            lines.append(f'  {fieldName}{spacer}{str(parser.encode(values))}')
         return bytes(''.join([i + '\r\r\n' for i in lines]), 'utf-8')
 
