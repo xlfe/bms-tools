@@ -13,7 +13,7 @@ from .registers import (Unit, DateReg, IntReg,
                         TempReg, TempRegRO, DelayReg, 
                         ScDsgoc2Reg, CxvpHighDelayScRelReg,
                         BitfieldReg, StringReg, ErrorCountReg,
-                        BasicInfoReg, CellInfoReg, DeviceInfoReg)
+                        BasicInfoReg, CellInfoReg, DeviceInfoReg, ReadOnlyException)
 
 __all__ = 'JBD'
 
@@ -263,17 +263,14 @@ class JBD:
                 except ReadOnlyException:
                     print(f'skipping read-only valueName {valueName}')
 
-            toWrite = set('ntc1 led_en covp covp_rel covp_delay design_cap cycle_cap cap_100 cap_80 cap_60 cap_40 cap_20 cap_0'.split())
-            
             for i,reg in enumerate(regs):
-                if toWrite & set(reg.valueNames) or 1:
-                    print('reg', reg.regName)
-                    data = reg.pack()
-                    cmd = self.writeCmd(reg.adx, data)
-                    self.s.write(cmd)
-                    ok, payload = self.readPacket()
-                    if not ok: raise BMSError()
-                    if payload is None: raise TimeoutError()
+                print('reg', reg.regName)
+                data = reg.pack()
+                cmd = self.writeCmd(reg.adx, data)
+                self.s.write(cmd)
+                ok, payload = self.readPacket()
+                if not ok: raise BMSError()
+                if payload is None: raise TimeoutError()
                 if progressFunc: progressFunc(int(i / (numRegs-1) * 100))
         finally:
             self.close()
