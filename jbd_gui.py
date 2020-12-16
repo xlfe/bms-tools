@@ -1529,7 +1529,7 @@ class Main(wx.Frame):
         self.worker.runOnce(self.worker.writeEepromWorker, data)
 
     def loadEeprom(self):
-        with wx.FileDialog(self, 'Load EEPROM', wildcard='Data files (*.fig)|*.fig',
+        with wx.FileDialog(self, 'Load EEPROM', wildcard='Data files (*.fig)|*.fig|All files (*.*)|*.*',
                     style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST) as fileDialog:
             if fileDialog.ShowModal() == wx.ID_CANCEL: return
             try:
@@ -1541,12 +1541,13 @@ class Main(wx.Frame):
                 wx.LogError('Cannot open file "{fn}".')
 
     def saveEeprom(self):
-        with wx.FileDialog(self, 'Save EEPROM', wildcard='Data files (*.fig)|*.fig',
+        with wx.FileDialog(self, 'Save EEPROM', wildcard='Data files (*.fig)|*.fig|All files (*.*)|*.*',
                         style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
 
             if fileDialog.ShowModal() == wx.ID_CANCEL: return
             try:
                 fn = fileDialog.GetPath()
+                if '.' not in fn: fn += '.fig'
                 data = self.gatherEeprom()
                 self.j.saveEepromFile(fn, data)
             except:
