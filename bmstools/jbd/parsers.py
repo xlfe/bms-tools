@@ -13,7 +13,11 @@ import struct
 
 class BaseParser: pass
 
-
+def SafeFloat(v):
+    try:
+        return float(v)
+    except ValueError:
+        return 0.0
 class IntParserX1(BaseParser):
     'encodes or decodes a single integer'
     factor = 1
@@ -35,8 +39,8 @@ class IntParserX1(BaseParser):
 
     @classmethod
     def encode(cls, values):
-        value = float(values[0])
-        return str(cls.StoU(value / cls.factor))
+        value = SafeFloat(values[0])
+        return cls.StoU(value / cls.factor)
 
 class IntParserX10(IntParserX1):
     factor = 10
@@ -59,7 +63,7 @@ class ScParser(BaseParser):
         i = sc_delay.val << 3
         i |= sc.val
         i |= (0x80 if sc_dsgoc_x2 else 0)
-        return str(i)
+        return i
 
 class Dsgoc2Parser(BaseParser):
     @staticmethod
@@ -73,7 +77,7 @@ class Dsgoc2Parser(BaseParser):
     def encode(values):
         dsgoc2, dsgoc2_delay = values
         i = dsgoc2.val | (dsgoc2_delay.val << 4)
-        return str(i)
+        return i
 
     
 class BitfieldParser(BaseParser):
@@ -103,7 +107,7 @@ class CxvpDelayParser(BaseParser):
         covp_high_delay, cuvp_high_delay = values
         i = (covp_high_delay.val & 0x3) << 6
         i |= (cuvp_high_delay.val & 0x3) << 4
-        return str(i)
+        return i
 
 class DateParser(BaseParser):
     @staticmethod
@@ -118,7 +122,10 @@ class DateParser(BaseParser):
 
     @staticmethod
     def encode(values):
-        year, month, day = (int(i) for i in values)
+        year, month, day = (int(SafeFloat(i)) for i in values)
+        year = max(min(year, 2128), 2000)
+        month = max(min(month, 12), 1)
+        day = max(min(day, 31), 1)
         value = (year - 2000) & 0x7f
         value <<= 4
         value |= month
@@ -135,7 +142,7 @@ class TempParser(IntParserX1):
     @classmethod
     def encode(cls, values):
         value = int(values[0])
-        return str(int(value * 10 + 2731))
+        return int(value * 10 + 2731)
 
 
 class StrParser(BaseParser):
