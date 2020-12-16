@@ -53,7 +53,7 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
      <td>Command byte: Read: 0x5A, Write: 0xA5</th>
      <td>Register Address Byte</th>
      <td>Data length byte</th>
-     <td>Data bytes, n = data le/ngth byte</th>
+     <td>Data bytes, n = data length byte</th>
     </tr>
 </table>
 
@@ -171,7 +171,7 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
          bit 9: Discharge overcurrent<br>
          bit 10: Short Circuit<br>
          bit 11: Frontend IC error<br>
-         bit 12: Charge or Discharge FET locked by config (See register 0x1e "MOS CTRL")<br>
+         bit 12: Charge or Discharge FET locked by config (See register 0xE1 "MOSFET control")<br>
         </td>
      <td>--</td>
      <td> covp_err, cuvp_err, povp_err, puvp_err, chgot_err, chgut_err, dsgot_err, dsgut_err, chgoc_err, dsgoc_err, sc_err, afe_err, software_err</td>
