@@ -143,7 +143,7 @@ class TempReg(IntReg):
         self._value = TempParser.decode(value)[0]
 
     def pack(self):
-        value = TempParser.encode(self._value)
+        value = TempParser.encode((self._value,))
         return struct.pack('>H', value)
 
 class TempRegRO(TempReg, ReadOnlyMixin): pass
@@ -312,7 +312,7 @@ class DateReg(BaseReg):
         self._year, self._month, self._day = DateParser.decode(value)
     
     def pack(self):
-        return struct.pack('>H', DateParser.encode(self._year, self._month, self._day))
+        return struct.pack('>H', DateParser.encode((self._year, self._month, self._day)))
 
 class ScDsgoc2Reg(BaseReg):
     _valueNames = ('sc', 'sc_delay', 'dsgoc2', 'dsgoc2_delay', 'sc_dsgoc_x2')
@@ -359,8 +359,8 @@ class ScDsgoc2Reg(BaseReg):
         self._dsgoc2, self._dsgoc2_delay = Dsgoc2Parser.decode(b2)
 
     def pack(self):
-        b1 = ScParser.encode(self._sc, self._sc_delay, self._sc_dsgoc_x2)
-        b2 = Dsgoc2Parser.encode(self._dsgoc2, self._dsgoc2_delay)
+        b1 = ScParser.encode((self._sc, self._sc_delay, self._sc_dsgoc_x2))
+        b2 = Dsgoc2Parser.encode((self._dsgoc2, self._dsgoc2_delay))
         return struct.pack('>BB', b1, b2)
 
 
@@ -402,7 +402,7 @@ class CxvpHighDelayScRelReg(BaseReg):
         self._covp_high_delay, self._cuvp_high_delay = CxvpDelayParser.decode(b1)
     
     def pack(self):
-        b1 = CxvpDelayParser.encode(self._cuvp_high_delay, self._covp_high_delay)
+        b1 = CxvpDelayParser.encode((self._cuvp_high_delay, self._covp_high_delay))
         return struct.pack('>BB', b1, self._sc_rel)
 
 class BasicInfoReg(BaseReg):
