@@ -6,6 +6,8 @@ This repository aims to provide open source tools for popular Battery Management
 ## Support
 Currently it only supports the [JBD](https://www.lithiumbatterypcb.com/) BMS.
 
+I've compiled some [JDB register documentation](JDB_REGISTER_MAP.md), and at the time of this writing the most complete that I could find.
+
 ## Code
 
 Currently provided:
