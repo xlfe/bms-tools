@@ -39,7 +39,7 @@ import wx.lib.masked.numctrl
 import wx.html2
 
 appName = 'JBD BMS Tools'
-appVersion = '0.0.1-alpha'
+appVersion = '1.0.0-beta'
 appUrl = 'https://gitlab.com/MrSurly/bms-tools'
 author = 'Eric Poulsen'
 authorEmail = 'eric@zyxod.com'
