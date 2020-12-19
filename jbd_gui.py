@@ -1261,15 +1261,15 @@ class Main(wx.Frame):
         nb = wx.Notebook(nb_panel)
         self.infoTab = wx.Panel(nb)
         self.settingsTab = wx.Panel(nb)
-        self.calTab = wx.Panel(nb)
+        #self.calTab = wx.Panel(nb)                       # uncomment for calibration tab
 
         layout.infoTabLayout(self.infoTab)
         layout.settingsTabLayout(self.settingsTab)
-        layout.calTabLayout(self.calTab)
+        #layout.calTabLayout(self.calTab)                 # uncomment for calibration tab
 
         nb.AddPage(self.infoTab, 'Info')
         nb.AddPage(self.settingsTab, 'Settings')
-        nb.AddPage(self.calTab, 'Calibration')
+        #nb.AddPage(self.calTab, 'Calibration')           # uncomment for calibration tab
 
         for c in ChildIter.iterNamed(self.settingsTab):
             c.Name = 'eeprom_' + c.Name
