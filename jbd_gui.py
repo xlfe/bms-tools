@@ -1,4 +1,21 @@
 #!/usr/bin/env python
+
+# BMS Tools
+# Copyright (C) 2020 Eric Poulsen
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import os
 import sys
 import time
@@ -87,7 +104,7 @@ ranges = {
     'cuvp_high':    cellRange,
 
     'bal_start':    cellRange,
-    'bal_window':   cellRange,
+    'bal_window':   (*cellRange[:2], 10),
 
     'design_cap':   mahRange,
     'cycle_cap':    mahRange,
@@ -106,6 +123,33 @@ ranges = {
     'cycle_cnt':    (0, 65535, 1),
     'shunt_res':    (0.0, 6553.5, .1),
 }
+
+class PulseText(wx.StaticText):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.origColors = self.GetBackgroundColour(), self.GetForegroundColour()
+        print(self.origColors)
+        self.timer = wx.Timer(self)
+        self.Bind(wx.EVT_TIMER, self._pulse)
+
+    def SetLabel(self, *args, **kwargs):
+        super().SetLabel(*args, **kwargs)
+        self._startPulse()
+
+    def _startPulse(self):
+        self._pulseCnt = 0
+        self.timer.Start(250)
+
+    def _pulse(self, evt):
+        self._pulseCnt += 1
+        print(f'pulse {self._pulseCnt}')
+        if self._pulseCnt == 5:
+            self.timer.Stop()
+
+
+
+
 
 class DebugWindow(wx.Frame):
     CloseEvent, EVT_TEXTFRAME_CLOSE = wx.lib.newevent.NewEvent()
@@ -484,7 +528,7 @@ class LayoutGen:
 
         # mfg date
         fgs.Add(wx.StaticText(sb, label='Mfg Date:'), 0, rflags)
-        t = wx.TextCtrl(sb, name='mfg_date', size=self.txtSize8)
+        t = wx.TextCtrl(sb, name='mfg_date', size=self.txtSize10)
         t.Enable(False)
         fgs.Add(t, 0, lflags)
 
@@ -956,12 +1000,12 @@ class LayoutGen:
         def gen(label1, field1, label2 = None, field2 = None):
             items = [
                 (wx.StaticText(sb, label = label1+':'), 0, rflags),
-                (wx.StaticText(sb, name = field1, label='-'), 0, lflags)
+                (wx.StaticText(sb, name = field1, label='----'), 0, lflags)
             ]
             if field2:
                 items += [
                 (wx.StaticText(sb, label = label2+':'), 0, rflags),
-                (wx.StaticText(sb, name = field2, label='-'), 0, lflags),
+                (wx.StaticText(sb, name = field2, label='----'), 0, lflags),
             ]
             return items
 
@@ -1263,7 +1307,7 @@ class Main(wx.Frame):
         serialButton = wx.Button(self, label='...', name = 'serial_btn')
         self.startStopButton = wx.Button(self, label='Start', name = 'start_stop_btn')
         self.progressGauge = wx.Gauge(self)
-        self.statusText = wx.StaticText(self)
+        self.statusText = PulseText(self)
         bot_sizer.AddSpacer(5)
         bot_sizer.Add(serialButton)
         bot_sizer.AddSpacer(20)
@@ -1635,6 +1679,8 @@ class BkgWorker:
                 elapsed = time.time() - then
                 delay = self.scan_delay - elapsed
 
+                if delay < 0:
+                    delay = 0
                 if delay > .2:
                     cnt = int(delay //.2)
                     slp = delay / cnt

@@ -1,5 +1,21 @@
 #!/usr/bin/env python
 
+# BMS Tools
+# Copyright (C) 2020 Eric Poulsen
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 from .parsers import *
 from .enums import *
 import struct
@@ -452,9 +468,10 @@ class BasicInfoReg(BaseReg):
         self._year, self._month, self._day = DateParser.decode(date_raw)
         offset += struct.calcsize(fmt)
 
-        fmt = '>LHBBBBB'
+        fmt = '>HHHBBBBB'
         values = struct.unpack_from(fmt, payload, offset)
-        bal_raw, fault_raw, self._version, self._cap_pct, fet_raw, self._cell_cnt, self._ntc_cnt = values
+        bal_raw0, bal_raw1, fault_raw, self._version, self._cap_pct, fet_raw, self._cell_cnt, self._ntc_cnt = values
+        bal_raw = bal_raw0 | (bal_raw1 << 16)
         for fn, value in self._unpackBits(self._balBits, bal_raw):
             setattr(self, fn, value)
         for fn, value in self._unpackBits(self._faultBits, fault_raw):
