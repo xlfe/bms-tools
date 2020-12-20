@@ -46,6 +46,12 @@ authorEmail = 'eric@zyxod.com'
 authorFullEmail = '"Eric Poulsen" <eric@zyxod.com>'
 releaseDate = 'N/A'
 appNameWithVersion = f'{appName} {appVersion}'
+try:
+    import commit_hash as ch
+    appCommitHash = ch.commit_hash
+    del ch
+except:
+    appCommitHash = ''
 
 import bmstools.jbd as jbd
 
@@ -221,7 +227,8 @@ class AboutDialog(wx.Dialog):
                 '',
                 authorEmail, 
                 '',
-                appUrl
+                appUrl,
+                *( ('', appCommitHash) if appCommitHash else ())
             ]
             t = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_AUTO_URL, size = (200,200))
             t.SetValue('\n'.join(lines))
@@ -1228,6 +1235,12 @@ class Main(wx.Frame):
             
         self.Bind(WriteRedirect.EVT_TEXT, self.onText)
         print(f'Welcome to {appNameWithVersion}\n')
+        if cli_args.clear_config:
+            print('deleting config info')
+            config = wx.Config.Get()
+            config.DeleteAll()
+            config.Flush()
+
 
         port = self.getLastSerialPort()
         print(f'Using port: {port.name or "None"} {repr(port)}')
@@ -1394,11 +1407,16 @@ class Main(wx.Frame):
         config = wx.Config.Get()
         serialPortName = config.Read('serial_port')
         print(f'last stored port name is {serialPortName}')
+        s = serial.Serial()
         for p in ports:
             if p.device == serialPortName:
-                return serial.Serial(p.device)
-        if ports: return serial.Serial(ports[0].device)
-        return serial.Serial()
+                s.port = p.device
+                break
+        else: 
+            if ports: 
+                s.port = ports[0].device
+                print(f'com port {repr(serialPortName)} not found, defaulting to {repr(s.port)}')
+        return s
 
     def onScanData(self, evt):
 
@@ -1736,10 +1754,10 @@ class JBDApp(wx.App):
         configAppName = appName.lower().replace(' ','_') 
         self.SetAppName(configAppName)
         self.SetAppDisplayName(appName)
-
         icon = wx.Icon(os.path.join(base_path, 'img', 'batt_icon_128.ico'))
         main = Main(None, title = appNameWithVersion, style = wx.DEFAULT_FRAME_STYLE | wx.WS_EX_VALIDATE_RECURSIVELY, icon = icon, cli_args = self.cli_args)
         main.Show()
+
 
         # startup warning
         d = wx.MessageDialog(None, warningMsg)
@@ -1752,6 +1770,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument('-n', '--no-redirect', action='store_true')
     p.add_argument('-o', '--open-debug', action='store_true')
+    p.add_argument('-c', '--clear-config', action='store_true')
     cli_args = p.parse_args()
 
     app = JBDApp(cli_args = cli_args)
