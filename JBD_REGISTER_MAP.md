@@ -960,5 +960,40 @@ Write the byte sequence 0x28, 0x28 to exit "Factory Mode," update the values in 
      <td></td>
      <td>To exit this mode: Enter, then exit factory mode.</td>
     </tr> 
+    <tr>
+     <td>0xAD</td>
+     <td></td>
+     <td>Idle Current Calibration</td>
+     <td>
+        U16: Write 0x0 when no current is flowing
+     </td>
+     <td>--</td>
+     <td></td>
+     <td></td>
+    </tr> 
+    <tr>
+     <td>0xAE</td>
+     <td></td>
+     <td>Charge Current Calibration</td>
+     <td>U16</td>
+     <td>10mA<td>
+     <td>Write the actual current. This value is positive.</td>
+    </tr> 
+    <tr>
+     <td>0xAF</td>
+     <td></td>
+     <td>Discharge Current Calibration</td>
+     <td>U16</td>
+     <td>10mA<td>
+     <td>Write the actual current. This value is positive.</td>
+    </tr> 
+    <tr>
+     <td>0xE0</td>
+     <td></td>
+     <td>Capacity remaining</td>
+     <td>U16</td>
+     <td>10mAH<td>
+     <td></td>
+    </tr> 
 
 </table>
