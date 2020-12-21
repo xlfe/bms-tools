@@ -58,6 +58,9 @@ Planned:
 
 * Command line app
 
+### Changelog
+[Changelog](CHANGELOG.md)
+
 ## Installation
 
 ### Backend Library
