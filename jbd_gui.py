@@ -39,7 +39,7 @@ import wx.lib.masked.numctrl
 import wx.html2
 
 appName = 'JBD BMS Tools'
-appVersion = '1.0.0-beta'
+appVersion = '1.0.1-beta'
 appUrl = 'https://gitlab.com/MrSurly/bms-tools'
 author = 'Eric Poulsen'
 authorEmail = 'eric@zyxod.com'
@@ -1735,7 +1735,7 @@ class BkgWorker:
 warningMsg = f'''Hi,
 
 Thanks for trying out {appName}. 
-This is an alpha version, and 
+This is an beta version, and 
 may contain bugs.  If you encounter
 any problems, please file an issue 
 by selecting "{appName} website" 
