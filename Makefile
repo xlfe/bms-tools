@@ -17,8 +17,9 @@ all: gui
 $(COMMIT_HASH_PYTHON):
 	echo \#!/usr/bin/env python > $@
 	echo commit_hash = \'$(COMMIT_HASH)\' >> $@
+	echo tag = \'$(EXACT_TAG)\' >> $@
 
-gui: commit_hash.py
+gui: $(COMMIT_HASH_PYTHON)
 	if [[ "$$OSTYPE" == "linux-gnu" ]]; then
 		echo Linux build ...
 		export OS_NAME='linux'
