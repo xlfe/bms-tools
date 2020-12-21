@@ -29,7 +29,7 @@ gui: $(COMMIT_HASH_PYTHON)
 		export OS_NAME='windows'
 		export PATHSEP=";"
 	fi
-	pyinstaller.exe jbd_gui.py --noconfirm ${WINDOWED} ${ONEFILE} --icon "img/batt_icon_128.ico" --add-data "img$${PATHSEP}img" -n bms_tools_jbd_$(if $(EXACT_TAG),$(EXACT_TAG),$(COMMIT_HASH))
+	pyinstaller.exe jbd_gui.py --noconfirm ${WINDOWED} ${ONEFILE} --icon "img/batt_icon_128.ico" --add-data "img$${PATHSEP}img" -n bms_tools_jbd_$(OS_NAME)_$(if $(EXACT_TAG),$(EXACT_TAG),$(COMMIT_HASH))
 	rm $(COMMIT_HASH_PYTHON)
 
 clean:
