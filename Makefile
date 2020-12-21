@@ -10,7 +10,7 @@ NAME=bms_utils_jbd
 COMMIT_HASH=$(shell git describe --long --dirty --abbrev=10 --tags)
 COMMIT_HASH_PYTHON=commit_hash.py
 DIRTY=$(findstring, dirty, $(COMMIT_HASH))
-EXACT_TAG=$(if $(DIRTY),,$(shell git tag --points-at HEAD))
+EXACT_TAG:=$(if $(DIRTY),,$(shell git tag --points-at HEAD))
 
 all: gui
 
