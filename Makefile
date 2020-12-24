@@ -1,7 +1,7 @@
 .ONESHELL:
 .PHONY: build clean all debug
 .SILENT:
-SHELL=/usr/bin/bash
+SHELL=/bin/bash
 WINDOWED=--windowed
 ONEFILE=--onefile
 
@@ -24,12 +24,14 @@ gui: $(COMMIT_HASH_PYTHON)
 		echo Linux build ...
 		export OS_NAME='linux'
 		export PATHSEP=":"
+		export PYINSTALLER='pyinstaller'
 	else
 		echo Windows build ...
 		export OS_NAME='windows'
 		export PATHSEP=";"
+		export PYINSTALLER='pyinstaller.exe'
 	fi
-	pyinstaller.exe jbd_gui.py --noconfirm ${WINDOWED} ${ONEFILE} --icon "img/batt_icon_128.ico" --add-data "img$${PATHSEP}img" -n bms_tools_jbd_$${OS_NAME}_$(if $(EXACT_TAG),$(EXACT_TAG),$(COMMIT_HASH))
+	$${PYINSTALLER} jbd_gui.py --noconfirm ${WINDOWED} ${ONEFILE} --icon "img/batt_icon_128.ico" --add-data "img$${PATHSEP}img" -n bms_tools_jbd_$${OS_NAME}_$(if $(EXACT_TAG),$(EXACT_TAG),$(COMMIT_HASH))
 	rm $(COMMIT_HASH_PYTHON)
 
 clean:

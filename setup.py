@@ -28,7 +28,7 @@ setup(
         'pyserial~=3.4', 
         ],
     extras_require = {
-        'gui': ['wxPython~=4.1.1']
+        'gui': ['wxPython~=4.1.1', 'pyinstaller']
     },
     license='Creative Commons Attribution-Noncommercial-Share Alike license',
     packages=['bmstools'],
