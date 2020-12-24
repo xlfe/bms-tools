@@ -462,7 +462,7 @@ class LayoutGen:
         if isinstance(sp, scrolled.ScrolledPanel):
             sp.SetupScrolling(scroll_x=False)
 
-        rows = 3
+        rows = 4
         cols = 4
         g = wx.grid.Grid(sp, name='cell_grid')
         g.CreateGrid(rows, cols)
@@ -1032,6 +1032,7 @@ class LayoutGen:
         vsizer  = wx.BoxSizer(wx.VERTICAL)
         tab.SetSizer(vsizer)
         self.voltCalLayout(tab, vsizer, colGap, boxGap)
+        self.ampCalLayout(tab, vsizer, colGap, boxGap)
 
         tab.Layout()
         tab.Fit()
@@ -1077,7 +1078,23 @@ class LayoutGen:
         for i in range(4):
             gbs.AddGrowableCol((i+1) * 4 - 1)
 
+        vbs = wx.BoxSizer(wx.VERTICAL)
+        sbs.Add(vbs, 0, *defaultBorder)
+        vbs.Add(wx.Button(sb, label='Calibrate', name='cal_volt_ntc_btn'), 0, wx.ALIGN_CENTER_HORIZONTAL)
 
+    def ampCalLayout(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+        sizer.Add(panel, 0, *defaultBorder)
+
+        sb = wx.StaticBox(panel, label='Ampere Calibration')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        panel.SetSizer(sbs)
+        
+        hbs = wx.BoxSizer(wx.HORIZONTAL)
+        sbs.Add(hbs, 0, *defaultBorder)
+        hbs.Add(wx.Button(sb, label='Idle Calibration', name='cal_idle_btn'), 0)
+        hbs.Add(wx.Button(sb, label='Charge Current Calibration', name='cal_chg_btn'), 0)
+        hbs.Add(wx.Button(sb, label='Discharge Current Calibration', name='cal_dsg_btn'), 0)
  
 class RoundGauge(wx.Panel):
     def __init__(self, *args, **kwargs):
@@ -1108,7 +1125,6 @@ class RoundGauge(wx.Panel):
         else:
             self.value += math.copysign(step, delta)
         self.Refresh()
-        
 
     def SetArc(self, start, end):
         self.arcStart = start
@@ -1241,7 +1257,6 @@ class Main(wx.Frame):
             config.DeleteAll()
             config.Flush()
 
-
         port = self.getLastSerialPort()
         print(f'Using port: {port.name or "None"} {repr(port)}')
         self.j = jbd.JBD(port)
@@ -1274,21 +1289,25 @@ class Main(wx.Frame):
         nb = wx.Notebook(nb_panel)
         self.infoTab = wx.Panel(nb)
         self.settingsTab = wx.Panel(nb)
-        #self.calTab = wx.Panel(nb)                       # uncomment for calibration tab
+        self.calTab = wx.Panel(nb)                       # uncomment for calibration tab
 
         layout.infoTabLayout(self.infoTab)
         layout.settingsTabLayout(self.settingsTab)
-        #layout.calTabLayout(self.calTab)                 # uncomment for calibration tab
+        layout.calTabLayout(self.calTab)                 # uncomment for calibration tab
 
         nb.AddPage(self.infoTab, 'Info')
         nb.AddPage(self.settingsTab, 'Settings')
-        #nb.AddPage(self.calTab, 'Calibration')           # uncomment for calibration tab
+        nb.AddPage(self.calTab, 'Calibration && Misc')           # uncomment for calibration tab
 
         for c in ChildIter.iterNamed(self.settingsTab):
             c.Name = 'eeprom_' + c.Name
 
         for c in ChildIter.iterNamed(self.infoTab):
             c.Name = 'info_' + c.Name
+
+        for c in ChildIter.iterNamed(self.calTab):
+            print(c.Name)
+            c.Name = 'cal_' + c.Name
 
         for name, r in ranges.items():
             name = 'eeprom_'+name
@@ -1333,6 +1352,7 @@ class Main(wx.Frame):
         self.Bind(BkgWorker.EVT_EEP_PROG, self.onProgress)
         self.Bind(BkgWorker.EVT_EEP_DONE, self.onEepromDone)
         self.Bind(BkgWorker.EVT_SCAN_DATA, self.onScanData)
+        self.Bind(BkgWorker.EVT_CAL_DONE, self.onCalDone)
         self.Bind(wx.EVT_BUTTON, self.onButtonClick)
         self.Bind(wx.EVT_CLOSE, self.onClose)
         self.updateSerialPort()
@@ -1440,11 +1460,19 @@ class Main(wx.Frame):
             grid.DeleteRows(numRows = gridRowsCurrent)
             grid.InsertRows(numRows = gridRowsNeeded)
 
+        # info tab grid
         for i in range(gridRowsNeeded):
             grid.SetCellValue(i, 0, str(i))
             grid.SetCellValue(i, 1, str(volts[i]) if i < len(volts) else '')
             grid.SetCellValue(i, 2, 'BAL' if i < len(bals) and bals[i] else '--')
             grid.SetCellValue(i, 3, str(temps[i]) if i < len(temps) else '')
+
+        # cal tab values
+        for i,v in enumerate(volts):
+            self.set(f'cal_cell_read{i}', v)
+
+        for i,t in enumerate(temps):
+            self.set(f'cal_ntc_read{i}', t)
 
         cell_max_mv = max(volts)
         cell_min_mv = min(volts)
@@ -1559,6 +1587,8 @@ class Main(wx.Frame):
             self.clearErrors()
         elif n == 'start_stop_btn':
             self.startStopScan()
+        elif n == 'cal_volt_ntc_btn':
+            self.voltNtcCal()
         else:
             print(f'unknown button {n}')
 
@@ -1578,6 +1608,63 @@ class Main(wx.Frame):
 
     def setLogFile(self):
         pass
+
+    def voltNtcCal(self):
+        try:
+            data = self.gatherCal()
+
+            # volts
+            prefix = 'cell_act'
+            prefix_len = len(prefix)
+            cellCal = {}
+            for k,v in [(k,v) for k,v in data.items() if k.startswith(prefix)]:
+                n = int(k[prefix_len:])
+                try:
+                    v = int(float(v))
+                    print(repr(k), n, repr(v))
+                    cellCal[n] = v
+                except ValueError:
+                    pass
+                    #print(f'bad value {repr(v)} for cell {n+1}')
+
+            # Kelvin
+            prefix = 'ntc_act'
+            prefix_len = len(prefix)
+            ntcCal = {}
+            for k,v in [(k,v) for k,v in data.items() if k.startswith(prefix)]:
+                n = int(k[prefix_len:])
+                try:
+                    v = float(v)
+                    print(repr(k), n, repr(v))
+                    ntcCal[n] = v
+                except ValueError:
+                    pass
+                    #print(f'bad value {repr(v)} for cell {n+1}')
+            self.accessLock.acquire()
+            self.calTab.Enable(False)
+            self.worker.runOnce(self.worker.calWorker, cellCal, ntcCal)
+        except:
+            traceback.print_exc()
+            self.accessLock.release()
+
+    def onCalDone(self, evt):
+        self.accessLock.release()
+        self.calTab.Enable(True)
+        self.worker.join()
+        if isinstance(evt.err, Exception):
+            traceback.print_tb(evt.err.__traceback__)
+            print(f'cal error: {repr(evt.err)}', file=sys.stderr)
+            if isinstance(evt.err, jbd.BMSError):
+                wx.LogError(f'Unable to communicate with BMS')
+
+    def gatherCal(self):
+        data = {}
+        for c in ChildIter.iterNamed(self):
+            if not c.Name.startswith('cal_'): continue
+            if not '_act' in c.Name: continue
+            n = c.Name[4:]
+            data[n] = self.get(c.Name)
+        return data
 
     def readEeprom(self):
         self.accessLock.acquire()
@@ -1635,11 +1722,12 @@ class BkgWorker:
     EepProg, EVT_EEP_PROG = wx.lib.newevent.NewEvent()
     EepDone, EVT_EEP_DONE = wx.lib.newevent.NewEvent()
     ScanData, EVT_SCAN_DATA = wx.lib.newevent.NewEvent()
+    CalDone, EVT_CAL_DONE = wx.lib.newevent.NewEvent()
 
     def __init__(self, parent, jbd):
         self.parent = parent
         self.j = jbd
-        self.eeprom_thread = None
+        self.worker_thread = None
         self.scan_thread = None
         self.scan_run = False
         self.scan_delay = 1
@@ -1651,7 +1739,7 @@ class BkgWorker:
         try:
             data = self.j.readEeprom(self.progress)
             wx.PostEvent(self.parent, self.EepDone(data = data))
-        except Exception as e:
+        except Exception  as e:
             wx.PostEvent(self.parent, self.EepDone(data = e))
         finally:
             wx.PostEvent(self.parent, self.EepProg(value = 100))
@@ -1666,13 +1754,36 @@ class BkgWorker:
             wx.PostEvent(self.parent, self.EepProg(value = 100))
 
     def runOnce(self, func, *args, **kwargs):
-        if self.eeprom_thread: return
-        self.eeprom_thread = threading.Thread(target = func, args = args, kwargs = kwargs)
-        self.eeprom_thread.start()
+        if self.worker_thread: return
+        self.worker_thread = threading.Thread(target = func, args = args, kwargs = kwargs)
+        self.worker_thread.start()
 
     @property
     def scanRunning(self):
         return bool(self.scan_thread)
+
+    def calWorker(self, cellData, ntcData):
+
+        cnt = len(cellData) + len(ntcData)
+        cur = 0
+
+        def progAdapter(n):
+            nonlocal cnt, cur
+            pct = int(cur / cnt * 100)
+            print('cal prog', pct)
+            self.progress(pct)
+            cur += 1
+
+        try:
+            print('calibrate start')
+            self.j.calCell(cellData, progAdapter)
+            self.j.calNtc(ntcData, progAdapter)
+            wx.PostEvent(self.parent, self.CalDone(err = None))
+        except Exception as e:
+            wx.PostEvent(self.parent, self.CalDone(err = e))
+        finally:
+            self.progress(100)
+            print('calibrate end')
 
     def scanWorker(self):
         try:
@@ -1727,10 +1838,10 @@ class BkgWorker:
         return ret
 
     def join(self):
-        if not self.eeprom_thread: return True
-        self.eeprom_thread.join(1)
-        ret = not self.eeprom_thread.is_alive()
-        self.eeprom_thread = None
+        if not self.worker_thread: return True
+        self.worker_thread.join(1)
+        ret = not self.worker_thread.is_alive()
+        self.worker_thread = None
 
 warningMsg = f'''Hi,
 
