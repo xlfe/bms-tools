@@ -758,30 +758,6 @@ Write the byte sequence 0x28, 0x28 to exit "Factory Mode," update the values in 
      <td></td>
     </tr> 
     <tr>
-     <td>0x39</td>
-     <td>cxvp_high_delay_sc_rel</td>
-     <td>Secondary cell under/over voltage release times, and short circuilt release time</td>
-     <td>
-        2 bytes:<br>
-        <br>
-        &nbsp;byte 0: <br>
-        &nbsp;&nbsp;bits 7:6: cuvp_high_delay<br>
-        &nbsp;&nbsp;&nbsp;0 = 1S<br>
-        &nbsp;&nbsp;&nbsp;1 = 4S<br>
-        &nbsp;&nbsp;&nbsp;2 = 8S<br>
-        &nbsp;&nbsp;&nbsp;3 = 16S<br>
-        &nbsp;&nbsp;bits 5:4: covp_high_delay<br>
-        &nbsp;&nbsp;&nbsp;0 = 1S<br>
-        &nbsp;&nbsp;&nbsp;1 = 2S<br>
-        &nbsp;&nbsp;&nbsp;2 = 4S<br>
-        &nbsp;&nbsp;&nbsp;3 = 8S<br>
-        <br>
-        &nbsp;byte 1: Short Circuit release time, seconds
-     </td>
-     <td> -- </td>
-     <td>cuvp_high_delay, covp_high_delay, sc_rel</td>
-     <td></td>
-    <tr>
      <td>0x38</td>
      <td>sc_dsgoc2</td>
      <td>Short circuit and secondary overcurrent settings</td>
@@ -953,7 +929,7 @@ Write the byte sequence 0x28, 0x28 to exit "Factory Mode," update the values in 
      <td>
         U16:<br>
         &nbsp;0x01: Open odd cells
-        &nbsp;0x02: Open event cells
+        &nbsp;0x02: Open even cells
         &nbsp;0x03: Close all cells
      </td>
      <td>--</td>
