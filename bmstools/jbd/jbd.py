@@ -36,10 +36,21 @@ __all__ = 'JBD'
 class BMSError(Exception): pass
 
 class JBD:
-    START           = 0xDD
-    END             = 0x77
-    READ            = 0xA5
-    WRITE           = 0x5A
+    START               = 0xDD
+    END                 = 0x77
+    READ                = 0xA5
+    WRITE               = 0x5A
+
+    CELL_CAL_REG_START  = 0xB0
+    CELL_CAL_REG_END    = 0xCF
+
+    NTC_CAL_REG_START   = 0xD0
+    NTC_CAL_REG_END     = 0xD7
+
+    I_CAL_IDLE_REG      = 0xAD
+    I_CAL_CHG_REG       = 0xAE
+    I_CAL_DSG_REG       = 0xAF
+
 
     def __init__(self, s, timeout = 1, debug = False):
         self.s = s
@@ -148,13 +159,14 @@ class JBD:
     
     @serial.setter
     def serial(self, s):
+        s.timeout = .25
         self.s = s 
 
     def open(self):
-        if not self._open_cnt:
+        self._open_cnt += 1
+        if self._open_cnt == 1:
             self._lock.acquire()
             self.s.open()
-        self._open_cnt += 1
     
     def close(self):
         if not self._open_cnt: 
@@ -191,12 +203,14 @@ class JBD:
 
     def readPacket(self):
         then = time.time() + self.timeout
+        self.dbgPrint(f'timeout is {self.timeout}')
         d = []
         msgLen = 0
         complete = False
         while then > time.time():
             byte = self.s.read()
-            if not byte: break
+            if not byte: 
+                continue
             byte = byte[0]
             d.append(byte)
             if len(d) == 4:
@@ -210,6 +224,14 @@ class JBD:
             return ok, self.extractPayload(bytes(d))
         self.dbgPrint(f'readPacket failed with {len(d)} bytes')
         return False, None
+
+    def __enter__(self):
+        self.open()
+        self.enterFactory()
+
+    def __exit__(self, type, value, traceback):
+        self.exitFactory()
+        self.close()
 
     def enterFactory(self):
         try:
@@ -240,9 +262,7 @@ class JBD:
             self.close()
 
     def readEeprom(self, progressFunc = None):
-        try:
-            self.open()
-            self.enterFactory()
+        with self:
             ret = {}
             numRegs = len(self.eeprom_regs)
             if progressFunc: progressFunc(0)
@@ -256,15 +276,10 @@ class JBD:
                 if progressFunc: progressFunc(int(i / (numRegs-1) * 100))
                 reg.unpack(payload)
                 ret.update(dict(reg))
-            self.exitFactory()
             return ret
-        finally:
-            self.close()
 
     def writeEeprom(self, data, progressFunc = None):
-        try:
-            self.open()
-            self.enterFactory()
+        with self:
             ret = {}
             numRegs = len(self.eeprom_regs)
             if progressFunc: progressFunc(0)
@@ -288,9 +303,6 @@ class JBD:
                 if not ok: raise BMSError()
                 if payload is None: raise TimeoutError()
                 if progressFunc: progressFunc(int(i / (numRegs-1) * 100))
-            self.exitFactory()
-        finally:
-            self.close()
 
     def loadEepromFile(self, filename):
         p = persist.JBDPersist()
@@ -303,12 +315,19 @@ class JBD:
         with open(filename, 'wb') as f:
             f.write(p.serialize(data))
 
-
+    def readInfo(self):
+        try:
+            self.open()
+            basic = self.readBasicInfo()
+            cell = self.readCellInfo()
+            device = self.readDeviceInfo()
+            return basic, cell, device
+        finally:
+            self.close()
 
     def readBasicInfo(self):
         try:
             self.open()
-            self.exitFactory()
             cmd = self.readCmd(self.basicInfoReg.adx)
             self.s.write(cmd)
             ok, payload = self.readPacket()
@@ -322,7 +341,6 @@ class JBD:
     def readCellInfo(self):
         try:
             self.open()
-            self.exitFactory()
             cmd = self.readCmd(self.cellInfoReg.adx)
             self.s.write(cmd)
             ok, payload = self.readPacket()
@@ -336,7 +354,6 @@ class JBD:
     def readDeviceInfo(self):
         try:
             self.open()
-            self.exitFactory()
             cmd = self.readCmd(self.deviceInfoReg.adx)
             self.s.write(cmd)
             ok, payload = self.readPacket()
@@ -348,8 +365,85 @@ class JBD:
             self.close()
     
     def clearErrors(self):
-        self.enterFactory()
-        self.exitFactory(True)
+        try:
+            self.open()
+            self.enterFactory()
+            self.exitFactory(True)
+        finally:
+            self.close()
+
+    def calCell(self, cells, progressFunc = None):
+        'cells is a dict of cell # (base 0) to mV'
+        with self:
+            cur = 0
+            cnt = len(cells)
+            for n, v in cells.items():
+                adx = self.CELL_CAL_REG_START + n
+                if adx > self.CELL_CAL_REG_END: continue
+                reg = IntReg('cal', adx, Unit.MV, 1)
+                reg.set('cal', v)
+                cmd = self.writeCmd(adx, reg.pack())
+                self.s.write(cmd)
+                #print(' '.join(f'{i:02X}' for i in cmd))
+                ok, payload = self.readPacket()
+                if not ok: raise BMSError()
+                if payload is None: raise TimeoutError()
+                if progressFunc: progressFunc(cur / cnt)
+                cur += 1
+
+    def calNtc(self, ntc, progressFunc = None):
+        'ntc is a dict of ntc # (base 0) to K'
+        with self:
+            self.enterFactory()
+            self.open()
+            self.debug = 0
+            self.timeout = 5
+
+            cur = 0
+            cnt = len(ntc)
+            for n, v in ntc.items():
+                adx = self.NTC_CAL_REG_START + n
+                if adx > self.NTC_CAL_REG_END: continue
+                reg = TempReg('cal', adx)
+                reg.set('cal', v)
+                cmd = self.writeCmd(adx, reg.pack())
+                self.s.write(cmd)
+                #print(' '.join(f'{i:02X}' for i in cmd))
+                ok, payload = self.readPacket()
+                if not ok: raise BMSError()
+                if payload is None: raise TimeoutError()
+                if progressFunc: progressFunc(cur / cnt)
+                cur += 1
+
+    def calIdleCurrent(self):
+        with self:
+            reg = IntReg('ma', self.I_CAL_IDLE_REG, Unit.MA, 10)
+            reg.set('ma', 0)
+            cmd = self.writeCmd(self.I_CAL_IDLE_REG, reg.pack())
+            self.s.write(cmd)
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
+            if payload is None: raise TimeoutError()
+
+    def calChgCurrent(self, value):
+        with self:
+            reg = IntReg('ma', self.I_CAL_CHG_REG, Unit.MA, 10)
+            reg.set('ma', value)
+            cmd = self.writeCmd(self.I_CAL_CHG_REG, reg.pack())
+            self.s.write(cmd)
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
+            if payload is None: raise TimeoutError()
+
+    def calDsgCurrent(self, value):
+        with self:
+            reg = IntReg('ma', self.I_CAL_DSG_REG, Unit.MA, 10)
+            reg.set('ma', value)
+            cmd = self.writeCmd(self.I_CAL_DSG_REG, reg.pack())
+            self.s.write(cmd)
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
+            if payload is None: raise TimeoutError()
 
 def checkRegNames():
     jbd = JBD(None)
