@@ -443,6 +443,7 @@ class LayoutGen:
         self.txtSize10 = tc.GetSizeFromTextSize(parent.GetTextExtent('9' * 10))
         self.txtSize8  = tc.GetSizeFromTextSize(parent.GetTextExtent('99999999'))
         self.txtSize6  = tc.GetSizeFromTextSize(parent.GetTextExtent('999999'))
+        self.txtSize5  = tc.GetSizeFromTextSize(parent.GetTextExtent('99999'))
         self.txtSize4  = tc.GetSizeFromTextSize(parent.GetTextExtent('9999'))
         self.txtSize3  = tc.GetSizeFromTextSize(parent.GetTextExtent('999'))
         self.txtSize2  = tc.GetSizeFromTextSize(parent.GetTextExtent('99'))
@@ -1124,11 +1125,11 @@ class LayoutGen:
         hbs.AddSpacer(10)
         hbs.Add(wx.Button(sb, label='Idle Calibration', name='cal_idle_btn'), 0)
         hbs.AddSpacer(10)
-        hbs.Add(wx.TextCtrl(sb, value='', name=f'chg_ma', size=self.txtSize4), 0)
+        hbs.Add(wx.TextCtrl(sb, value='', name=f'chg_ma', size=self.txtSize5), 0)
         hbs.AddSpacer(4)
         hbs.Add(wx.Button(sb, label='Charge Calibration', name='cal_chg_btn'), 0)
         hbs.AddSpacer(10)
-        hbs.Add(wx.TextCtrl(sb, value='', name=f'dsg_ma', size=self.txtSize4), 0)
+        hbs.Add(wx.TextCtrl(sb, value='', name=f'dsg_ma', size=self.txtSize5), 0)
         hbs.AddSpacer(4)
         hbs.Add(wx.Button(sb, label='Discharge Calibration', name='cal_dsg_btn'), 0)
  
@@ -1712,7 +1713,7 @@ class Main(wx.Frame):
         try:
             self.accessLock.acquire()
             self.calTab.Enable(False)
-            self.j.calChgCurrentself.get('cal_chg_ma')()
+            self.j.calChgCurrent(self.get('cal_chg_ma'))
         finally:
             self.calTab.Enable(True)
             traceback.print_exc()
