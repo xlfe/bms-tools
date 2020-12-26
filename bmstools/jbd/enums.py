@@ -18,17 +18,18 @@
 
 from enum import Enum
 class Unit(Enum):
-    MV  = ('millivolt', 'mV')
-    V   = ('volt', 'V')
-    C   = ('Celsius', '°C')
-    S   = ('second', 's')
-    K   = ('Kelvin', 'K')
-    MA  = ('milliampere', 'mA')
-    MAH = ('milliampere hour', 'mAh')
-    AH  = ('ampere hour', 'Ah')
-    A   = ('ampere', 'A')
-    PCT = ('percent', '%')
-    MO  = ('milliohms', 'mΩ')
+    MV   = ('millivolt', 'mV')
+    V    = ('volt', 'V')
+    C    = ('Celsius', '°C')
+    S    = ('second', 's')
+    K    = ('Kelvin', 'K')
+    MA   = ('milliampere', 'mA')
+    MAH  = ('milliampere hour', 'mAh')
+    AH   = ('ampere hour', 'Ah')
+    A    = ('ampere', 'A')
+    PCT  = ('percent', '%')
+    MO   = ('milliohms', 'mΩ')
+    NONE = ('None', '')
 
     def __init__(self, long_name, symbol):
         self.long_name = long_name
