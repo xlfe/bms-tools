@@ -1141,25 +1141,38 @@ class LayoutGen:
         sb = wx.StaticBox(panel, label='Miscellaneous')
         sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
         panel.SetSizer(sbs)
-        
+
+        gbs = wx.GridBagSizer(5,5)
+        sbs.Add(gbs)
+
+        row = 0
         hbs = wx.BoxSizer(wx.HORIZONTAL)
-        sbs.Add(hbs, 0, *defaultBorder)
+        gbs.Add(wx.StaticText(sb, label = 'FET Control:'), wx.GBPosition(row,0), flag = lflags)
+        gbs.Add(hbs, wx.GBPosition(row,1))
         hbs.Add(wx.CheckBox(sb, label='Charge Enable', name='chg_enable'), 0, lflags)
         hbs.AddSpacer(10)
         hbs.Add(wx.CheckBox(sb, label='Discharge Enable', name='dsg_enable'), 0, lflags)
         hbs.AddSpacer(20)
         hbs.Add(wx.Button(sb, label='Set', name='chg_dsg_enable_btn'))
 
-        hbs.AddSpacer(15)
-        hbs.Add(wx.StaticText(sb, label = '|'), 0, lflags)
-        hbs.AddSpacer(15)
-        hbs.Add(wx.StaticText(sb, label = 'Balance Testing:'), 0, lflags)
-        hbs.AddSpacer(10)
+        row += 1
+        row += 1
+        hbs = wx.BoxSizer(wx.HORIZONTAL)
+        gbs.Add(wx.StaticText(sb, label = 'Balance Testing:'), wx.GBPosition(row,0), flag = lflags)
+        gbs.Add(hbs, wx.GBPosition(row,1))
         hbs.Add(wx.Button(sb, label='Open Odd Bal', name='open_odd_bal_btn'))
         hbs.Add(wx.Button(sb, label='Open Even Bal', name='open_even_bal_btn'))
         hbs.Add(wx.Button(sb, label='Close All Bal', name='close_all_bal_btn'))
         hbs.Add(wx.Button(sb, label='Exit', name='exit_bal_btn'))
- 
+
+        row += 1
+        row += 1
+        hbs = wx.BoxSizer(wx.HORIZONTAL)
+        hbs = wx.BoxSizer(wx.HORIZONTAL)
+        gbs.Add(wx.StaticText(sb, label = 'Set remaining capacity:'), wx.GBPosition(row,0), flag = lflags)
+        gbs.Add(hbs, wx.GBPosition(row,1))
+        hbs.Add(wx.TextCtrl(sb, value='', name=f'set_pack_cap_rem', size=self.txtSize5), 0)
+        hbs.Add(wx.Button(sb, label='Set', name='set_pack_cap_rem_btn'))
  
 class RoundGauge(wx.Panel):
     def __init__(self, *args, **kwargs):
@@ -1678,6 +1691,8 @@ class Main(wx.Frame):
             self.balOpenOdd()
         elif n == 'exit_bal_btn':
             self.balExit()
+        elif n == 'set_pack_cap_rem_btn':
+            self.setPackCapRem()
         else:
             print(f'unknown button {n}')
 
@@ -1819,6 +1834,21 @@ class Main(wx.Frame):
             self.accessLock.acquire()
             self.calTab.Enable(False)
             self.j.balExit()
+        except:
+            traceback.print_exc()
+        finally:
+            self.calTab.Enable(True)
+            self.accessLock.release()
+
+    def setPackCapRem(self):
+        try:
+            self.accessLock.acquire()
+            try:
+                value = int(float(self.get('cal_set_pack_cap_rem')))
+            except:
+                return
+            self.calTab.Enable(False)
+            self.j.setPackCapRem(value)
         except:
             traceback.print_exc()
         finally:
