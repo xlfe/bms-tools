@@ -51,6 +51,9 @@ class JBD:
     I_CAL_CHG_REG       = 0xAE
     I_CAL_DSG_REG       = 0xAF
 
+    CHG_DSG_EN_REG      = 0xE1
+    BAL_CTRL_REG        = 0xE2
+
 
     def __init__(self, s, timeout = 1, debug = False):
         self.s = s
@@ -429,7 +432,7 @@ class JBD:
         with self:
             reg = IntReg('ma', self.I_CAL_CHG_REG, Unit.MA, 10)
             reg.set('ma', value)
-            cmd = self.writeCmd(self.I_CAL_CHG_REG, reg.pack())
+            cmd = self.writeCmd(reg.adx, reg.pack())
             self.s.write(cmd)
             ok, payload = self.readPacket()
             if not ok: raise BMSError()
@@ -439,11 +442,74 @@ class JBD:
         with self:
             reg = IntReg('ma', self.I_CAL_DSG_REG, Unit.MA, 10)
             reg.set('ma', value)
-            cmd = self.writeCmd(self.I_CAL_DSG_REG, reg.pack())
+            cmd = self.writeCmd(reg.adx, reg.pack())
             self.s.write(cmd)
             ok, payload = self.readPacket()
             if not ok: raise BMSError()
             if payload is None: raise TimeoutError()
+
+    def chgDsgEnable(self, chgEnable, dsgEnable):
+        ce = 0 if chgEnable else 1
+        de = 0 if dsgEnable else 1
+        value = ce | (de << 1)
+        with self:
+            reg = IntReg('x', self.CHG_DSG_EN_REG, Unit.NONE, 1)
+            reg.set('x', value)
+            cmd = self.writeCmd(reg.adx, reg.pack())
+            self.s.write(cmd)
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
+            if payload is None: raise TimeoutError()
+
+    def balCloseAll(self):
+        self._balTestWrite(3)
+    
+    def balOpenOdd(self):
+        self._balTestWrite(1)
+
+    def balOpenEven(self):
+        self._balTestWrite(2)
+
+    def balExit(self):
+        with self: # enter / leave factory
+            pass
+
+    def _balTestWrite(self, value):
+        try:
+            self.open()
+            self.enterFactory()
+            reg = IntReg('x', self.BAL_CTRL_REG, Unit.NONE, 1)
+            reg.set('x', value)
+            cmd = self.writeCmd(reg.adx, reg.pack())
+            self.s.write(cmd)
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
+            if payload is None: raise TimeoutError()
+        finally:
+            self.close()
+
+    def readIntReg(self, adx):
+        with self:
+            reg = IntReg('x', adx, Unit.NONE, 1)
+            cmd = self.readCmd(reg.adx, reg.pack())
+            self.s.write(cmd)
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
+            if payload is None: raise TimeoutError()
+            reg.unpack(payload)
+            return reg.get('x')
+
+    def writeIntReg(self, adx, value):
+        with self:
+            reg = IntReg('x', adx, Unit.NONE, 1)
+            reg.set('x', int(value))
+            cmd = self.writeCmd(reg.adx, reg.pack())
+            self.s.write(cmd)
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
+            if payload is None: raise TimeoutError()
+
+
 
 def checkRegNames():
     jbd = JBD(None)
