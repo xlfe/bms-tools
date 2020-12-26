@@ -54,6 +54,8 @@ class JBD:
     CHG_DSG_EN_REG      = 0xE1
     BAL_CTRL_REG        = 0xE2
 
+    CAP_REM_REG         = 0xE0
+
 
     def __init__(self, s, timeout = 1, debug = False):
         self.s = s
@@ -487,6 +489,16 @@ class JBD:
             if payload is None: raise TimeoutError()
         finally:
             self.close()
+
+    def setPackCapRem(self, value):
+        with self:
+            reg = IntReg('mah', self.CAP_REM_REG, Unit.MAH, 10)
+            reg.set('mah', value)
+            cmd = self.writeCmd(reg.adx, reg.pack())
+            self.s.write(cmd)
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
+            if payload is None: raise TimeoutError()
 
     def readIntReg(self, adx):
         with self:
