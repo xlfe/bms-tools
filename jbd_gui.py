@@ -1056,6 +1056,7 @@ class LayoutGen:
         tab.SetSizer(vsizer)
         self.voltCalLayout(tab, vsizer, colGap, boxGap)
         self.ampCalLayout(tab, vsizer, colGap, boxGap)
+        self.miscCalLayout(tab, vsizer, colGap, boxGap)
 
         tab.Layout()
         tab.Fit()
@@ -1132,6 +1133,33 @@ class LayoutGen:
         hbs.Add(wx.TextCtrl(sb, value='', name=f'dsg_ma', size=self.txtSize5), 0)
         hbs.AddSpacer(4)
         hbs.Add(wx.Button(sb, label='Discharge Calibration', name='cal_dsg_btn'), 0)
+
+    def miscCalLayout(self, parent, sizer, colGap, boxGap):
+        panel = wx.Panel(parent)
+        sizer.Add(panel, 0, *defaultBorder)
+
+        sb = wx.StaticBox(panel, label='Miscellaneous')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+        panel.SetSizer(sbs)
+        
+        hbs = wx.BoxSizer(wx.HORIZONTAL)
+        sbs.Add(hbs, 0, *defaultBorder)
+        hbs.Add(wx.CheckBox(sb, label='Charge Enable', name='chg_enable'), 0, lflags)
+        hbs.AddSpacer(10)
+        hbs.Add(wx.CheckBox(sb, label='Discharge Enable', name='dsg_enable'), 0, lflags)
+        hbs.AddSpacer(20)
+        hbs.Add(wx.Button(sb, label='Set', name='chg_dsg_enable_btn'))
+
+        hbs.AddSpacer(15)
+        hbs.Add(wx.StaticText(sb, label = '|'), 0, lflags)
+        hbs.AddSpacer(15)
+        hbs.Add(wx.StaticText(sb, label = 'Balance Testing:'), 0, lflags)
+        hbs.AddSpacer(10)
+        hbs.Add(wx.Button(sb, label='Open Odd Bal', name='open_odd_bal_btn'))
+        hbs.Add(wx.Button(sb, label='Open Even Bal', name='open_even_bal_btn'))
+        hbs.Add(wx.Button(sb, label='Close All Bal', name='close_all_bal_btn'))
+        hbs.Add(wx.Button(sb, label='Exit', name='exit_bal_btn'))
+ 
  
 class RoundGauge(wx.Panel):
     def __init__(self, *args, **kwargs):
@@ -1640,7 +1668,16 @@ class Main(wx.Frame):
             self.chgCalMa()
         elif n == 'cal_dsg_btn':
             self.dsgCalMa()
-            pass
+        elif n == 'chg_dsg_enable_btn':
+            self.chgDsgEnable()
+        elif n == 'close_all_bal_btn':
+            self.balCloseAll()
+        elif n == 'open_even_bal_btn':
+            self.balOpenEven()
+        elif n == 'open_odd_bal_btn':
+            self.balOpenOdd()
+        elif n == 'exit_bal_btn':
+            self.balExit()
         else:
             print(f'unknown button {n}')
 
@@ -1714,9 +1751,10 @@ class Main(wx.Frame):
             self.accessLock.acquire()
             self.calTab.Enable(False)
             self.j.calChgCurrent(self.get('cal_chg_ma'))
+        except:
+            traceback.print_exc()
         finally:
             self.calTab.Enable(True)
-            traceback.print_exc()
             self.accessLock.release()
 
     def dsgCalMa(self):
@@ -1724,9 +1762,67 @@ class Main(wx.Frame):
             self.accessLock.acquire()
             self.calTab.Enable(False)
             self.j.calDsgCurrent(self.get('cal_dsg_ma'))
+        except:
+            traceback.print_exc()
         finally:
             self.calTab.Enable(True)
+            self.accessLock.release()
+
+    def chgDsgEnable(self):
+        try:
+            self.accessLock.acquire()
+            self.calTab.Enable(False)
+            ce = self.get('cal_chg_enable')
+            de = self.get('cal_dsg_enable')
+            self.j.chgDsgEnable(ce, de)
+        except:
             traceback.print_exc()
+        finally:
+            self.calTab.Enable(True)
+            self.accessLock.release()
+
+    def balCloseAll(self):
+        try:
+            self.accessLock.acquire()
+            self.calTab.Enable(False)
+            self.j.balCloseAll()
+        except:
+            traceback.print_exc()
+        finally:
+            self.calTab.Enable(True)
+            self.accessLock.release()
+
+    def balOpenEven(self):
+        try:
+            self.accessLock.acquire()
+            self.calTab.Enable(False)
+            self.j.balOpenEven()
+        except:
+            traceback.print_exc()
+        finally:
+            self.calTab.Enable(True)
+            self.accessLock.release()
+
+    def balOpenOdd(self):
+        try:
+            self.accessLock.acquire()
+            self.calTab.Enable(False)
+            self.j.balOpenOdd()
+        except:
+            traceback.print_exc()
+        finally:
+            self.calTab.Enable(True)
+            self.accessLock.release()
+
+    def balExit(self):
+        try:
+            self.accessLock.acquire()
+            self.calTab.Enable(False)
+            self.j.balExit()
+        except:
+            traceback.print_exc()
+        finally:
+            self.calTab.Enable(True)
             self.accessLock.release()
 
     def onCalDone(self, evt):
