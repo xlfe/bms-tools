@@ -1142,12 +1142,12 @@ class LayoutGen:
         sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
         panel.SetSizer(sbs)
 
-        gbs = wx.GridBagSizer(5,5)
+        gbs = wx.GridBagSizer(2,2)
         sbs.Add(gbs)
 
         row = 0
         hbs = wx.BoxSizer(wx.HORIZONTAL)
-        gbs.Add(wx.StaticText(sb, label = 'FET Control:'), wx.GBPosition(row,0), flag = lflags)
+        gbs.Add(wx.StaticText(sb, label = 'FET Control:'), wx.GBPosition(row,0), flag = rflags)
         gbs.Add(hbs, wx.GBPosition(row,1))
         hbs.Add(wx.CheckBox(sb, label='Charge Enable', name='chg_enable'), 0, lflags)
         hbs.AddSpacer(10)
@@ -1158,7 +1158,7 @@ class LayoutGen:
         row += 1
         row += 1
         hbs = wx.BoxSizer(wx.HORIZONTAL)
-        gbs.Add(wx.StaticText(sb, label = 'Balance Testing:'), wx.GBPosition(row,0), flag = lflags)
+        gbs.Add(wx.StaticText(sb, label = 'Balance Testing:'), wx.GBPosition(row,0), flag = rflags)
         gbs.Add(hbs, wx.GBPosition(row,1))
         hbs.Add(wx.Button(sb, label='Open Odd Bal', name='open_odd_bal_btn'))
         hbs.Add(wx.Button(sb, label='Open Even Bal', name='open_even_bal_btn'))
@@ -1169,7 +1169,7 @@ class LayoutGen:
         row += 1
         hbs = wx.BoxSizer(wx.HORIZONTAL)
         hbs = wx.BoxSizer(wx.HORIZONTAL)
-        gbs.Add(wx.StaticText(sb, label = 'Set remaining capacity:'), wx.GBPosition(row,0), flag = lflags)
+        gbs.Add(wx.StaticText(sb, label = 'Set remaining capacity:'), wx.GBPosition(row,0), flag = rflags)
         gbs.Add(hbs, wx.GBPosition(row,1))
         hbs.Add(wx.TextCtrl(sb, value='', name=f'set_pack_cap_rem', size=self.txtSize5), 0)
         hbs.Add(wx.Button(sb, label='Set', name='set_pack_cap_rem_btn'))
