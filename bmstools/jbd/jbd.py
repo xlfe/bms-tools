@@ -163,10 +163,10 @@ class JBD:
         self.s = s 
 
     def open(self):
-        if not self._open_cnt:
+        self._open_cnt += 1
+        if self._open_cnt == 1:
             self._lock.acquire()
             self.s.open()
-        self._open_cnt += 1
     
     def close(self):
         if not self._open_cnt: 
@@ -232,7 +232,6 @@ class JBD:
     def __exit__(self, type, value, traceback):
         self.exitFactory()
         self.close()
-
 
     def enterFactory(self):
         try:
