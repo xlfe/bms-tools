@@ -2,12 +2,10 @@
 
 ## Screenshots
 
-![Windows info tab screenshot](img/windows-info-screenshot.png)
+<a href="img/windows-info-screenshot.png"><img src="img/windows-info-screenshot.png" width="250"/></a><br>
 Windows version, cell info tab.
 
-![Windows settings tab screenshot](img/windows-settings-screenshot.png)
-Windows version, settings tab.
-
+[More Screenhots](SCREENSHOTS.md)
 
 
 ## Purpose
@@ -31,10 +29,10 @@ I've compiled some [JBD register documentation](JBD_REGISTER_MAP.md), and at the
     <td>EEPROM Settings</td><td bgcolor="green"><font color="white">Full support</font></td>
   </tr>
   <tr>
-    <td>Calibration</td><td bgcolor="yellow"><font color="black">In progress</font></td>
+    <td>Calibration</td><td bgcolor="green"><font color="black">Full support</font></td>
   </tr>
   <tr>
-    <td>MOS Control, Remaining capacity edit, balance control</td><td bgcolor="yellow"><font color="black">In progress</font></td>
+    <td>MOS Control, Remaining capacity edit, balance control</td><td bgcolor="green"><font color="black">Full support</font></td>
   </tr>
   <tr>
     <td>Logging</td><td bgcolor="yellow"><font color="black">In progress</font></td>
