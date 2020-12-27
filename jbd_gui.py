@@ -164,7 +164,8 @@ class PulseText(wx.StaticText):
 
     def SetLabel(self, *args, **kwargs):
         super().SetLabel(*args, **kwargs)
-        self._startPulse()
+        if args and args[0]:
+            self._startPulse()
 
     def _startPulse(self):
         self._pulseCnt = 0
@@ -1410,11 +1411,8 @@ class Main(wx.Frame):
         self.SetSizer(sizer)
 
         bot_sizer = wx.BoxSizer()
-        t = wx.TextCtrl(self, name='serial_port_txt')
-        t.Enable(0)
-        bot_sizer.Add(t)
-        serialButton = wx.Button(self, label='...', name = 'serial_btn')
-        self.startStopButton = wx.Button(self, label='Start', name = 'start_stop_btn')
+        serialButton = wx.Button(self, label='Serial', name = 'serial_btn')
+        self.startStopButton = wx.Button(self, label='Start Scan', name = 'start_stop_btn')
         self.progressGauge = wx.Gauge(self)
         self.statusText = PulseText(self)
         bot_sizer.AddSpacer(5)
@@ -1422,7 +1420,7 @@ class Main(wx.Frame):
         bot_sizer.AddSpacer(20)
         bot_sizer.Add(self.startStopButton)
         bot_sizer.AddSpacer(20)
-        bot_sizer.Add(self.statusText)
+        bot_sizer.Add(self.statusText, 0, lflags)
         bot_sizer.Add(self.progressGauge, 1 , wx.EXPAND | wx.LEFT, 20)
         sizer.Add(bot_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
@@ -1505,7 +1503,7 @@ class Main(wx.Frame):
             self.updateSerialPort()
 
     def updateSerialPort(self):
-        self.FindWindowByName('serial_port_txt').SetValue(self.j.serial.port)
+        self.FindWindowByName('serial_btn').SetLabel(self.j.serial.port)
 
     def getLastSerialPort(self):
         ports = serial.tools.list_ports.comports()
@@ -1529,6 +1527,8 @@ class Main(wx.Frame):
             print(''.join(traceback.format_tb(evt.err.__traceback__)), file = sys.stderr)
             self.setStatus('Scan Error')
             return
+
+        self.setStatus('')
 
         #sometimes we get data after stopping ...
         if self.worker.scanRunning:
@@ -1700,13 +1700,13 @@ class Main(wx.Frame):
         if self.worker.scanRunning:
             self.startStopButton.Enable(False)
             self.worker.stopScan()
-            self.startStopButton.SetLabel('Start')
+            self.startStopButton.SetLabel('Start Scan')
             self.startStopButton.Enable(True)
             self.progressGauge.SetValue(0)
         else:
             self.startStopButton.Enable(False)
             self.worker.startScan()
-            self.startStopButton.SetLabel('Stop')
+            self.startStopButton.SetLabel('Stop Scan')
             self.startStopButton.Enable(True)
             self.progressGauge.Pulse()
 
