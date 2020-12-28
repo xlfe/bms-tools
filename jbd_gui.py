@@ -179,13 +179,22 @@ class DebugWindow(wx.Frame):
         if n == 'clear_btn':
             self.txt.Clear()
 
+    def trim(self):
+        value = self.txt.GetValue()
+        value = value.replace('\n\n', '\n') # this is stupid
+        lines = value.splitlines()
+        lines = lines[-500:]
+        self.txt.SetValue(''.join([i+'\n' for i in lines]))
+
     def stdout(self, text):
         self.txt.SetDefaultStyle(self.outStyle)
         self.txt.write(text)
+        self.trim()
 
     def stderr(self, text):
         self.txt.SetDefaultStyle(self.errStyle)
         self.txt.write(text)
+        self.trim()
         self.Show()
 
     write = stdout
