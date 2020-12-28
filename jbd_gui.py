@@ -22,6 +22,8 @@ import time
 import re
 import serial
 import serial.tools.list_ports
+from openpyxl import Workbook
+from openpyxl.cell import WriteOnlyCell
 import math
 import enum
 import random
@@ -37,23 +39,17 @@ import wx.lib.scrolledpanel as scrolled
 import wx.lib.newevent
 import wx.lib.masked.numctrl
 import wx.html2
+import bmstools.jbd as jbd
+import bmstools.version 
 
 appName = 'JBD BMS Tools'
-appVersion = '1.0.1-beta'
+appVersion = bmstools.version
 appUrl = 'https://gitlab.com/MrSurly/bms-tools'
 author = 'Eric Poulsen'
 authorEmail = 'eric@zyxod.com'
 authorFullEmail = '"Eric Poulsen" <eric@zyxod.com>'
 releaseDate = 'N/A'
 appNameWithVersion = f'{appName} {appVersion}'
-try:
-    import commit_hash as ch
-    appCommitHash = ch.commit_hash
-    del ch
-except:
-    appCommitHash = ''
-
-import bmstools.jbd as jbd
 
 try:
     # PyInstaller creates a temp folder and stores path in _MEIPASS
@@ -129,6 +125,134 @@ ranges = {
     'cycle_cnt':    (0, 65535, 1),
     'shunt_res':    (0.0, 6553.5, .1),
 }
+
+class Logger:
+    @staticmethod
+    def pvConvCompat(x):
+        return f'{float(x) / 1000:.02f}V'
+
+    @staticmethod
+    def cvConvCompat(x):
+        return f'{float(x) / 1000:.03f} V' # yes, space is intentional 
+    
+    @staticmethod
+    def piConvCompat(x):
+        return f'{float(x) / 1000:.02f}A'
+
+    @staticmethod
+    def pctConvCompat(x):
+        return f'{int(x):d}%'
+
+    @staticmethod
+    def capConvCompat(x):
+        return f'{int(x)}mAH'
+
+    @staticmethod
+    def tempConvCompat(x):
+        return float(x)
+
+    @staticmethod
+    def boolConvCompat(x):
+        return 'ON' if x else 'OFF'
+    
+    @staticmethod
+    def faultConvCompat(x):
+        return f'{int(x):x}'
+
+    @staticmethod
+    def balConvCompat(x):
+        return f'{int(x):x}'
+
+    headerNames1 = 'Date time PackVoltage current'.split()
+    headerNames2 = ['Average Vol', 'MaxCell', 'MinCell', 
+                    'RSOC', 'Remain cap', 'Full Charge Cap', # capitalization intentionally wrong
+                    'Cycle Count'] 
+    headerNames3 = ['CHG Fet Status', 'DSG Fet Status', 
+                    'ProtectStatus', 'BalanceStatus']
+    
+    def __init__(self, fn):
+        self.logFilename = fn
+        print(f'logfile name: {fn}')
+        if os.path.exists(fn):
+            os.remove(fn)
+        self.headerWritten = False
+        self.rowNum = 0
+        if fn.lower().endswith('.xls') or fn.lower().endswith('.xlsx'):
+            self.logFileHandle = Workbook(write_only = True)
+        else:
+            self.logFileHandle = open(fn, 'w+')
+        self.fn = fn
+
+    def _logRow(self, row):
+        if not self.logFileHandle: return
+        h = self.logFileHandle
+        if isinstance(h, Workbook):
+            print('workbook')
+            worksheets = h.worksheets
+            if not worksheets:
+                ws = h.create_sheet('test') # matches jbd app
+            else:
+                ws = worksheets[0]
+            ws.append(row)
+        else:
+            h.write(','.join([str(i) for i in row])+'\n')
+            h.flush()
+
+        print('logged', row)
+
+        self.rowNum += 1
+
+    def _logCompat(self, basicInfo, cellInfo):
+        cellInfo = list(cellInfo.values())
+        cellCnt = len(cellInfo)
+        ntcCnt = basicInfo['ntc_cnt']
+        if not self.headerWritten:
+            self.headerWritten = True
+            h = (*self.headerNames1,
+                 *[f'Cell{i+1}' for i in range(cellCnt)],
+                 *self.headerNames2,
+                 *[f'temp{i+1}' for i in range(ntcCnt)],
+                 * self.headerNames3)
+            self._logRow(h)
+        row = (
+            *self.dateGen(),
+            self.pvConvCompat(basicInfo['pack_mv']),
+            self.piConvCompat(basicInfo['pack_ma']),
+            *[self.cvConvCompat(i) for i in cellInfo],
+            self.cvConvCompat(sum(cellInfo) / cellCnt),
+            self.cvConvCompat(max(cellInfo)),
+            self.cvConvCompat(min(cellInfo)),
+            self.pctConvCompat(basicInfo['cap_pct']),
+            self.capConvCompat(basicInfo['cycle_cap']),
+            self.capConvCompat(basicInfo['design_cap']),
+            basicInfo['cycle_cnt'],
+            *[self.tempConvCompat(basicInfo[f'ntc{i}']) for i in range(ntcCnt)],
+            self.boolConvCompat(basicInfo['chg_fet_en']),
+            self.boolConvCompat(basicInfo['dsg_fet_en']),
+            self.faultConvCompat(basicInfo['fault_raw']),
+            self.balConvCompat(basicInfo['bal_raw']) 
+        )
+        self._logRow(row)
+
+    def log(self, basicInfo, cellInfo):
+        self._logCompat(basicInfo, cellInfo)
+
+    @staticmethod
+    def dateGen():
+        t = time.localtime()
+        return time.strftime('%Y-%m-%d', t), time.strftime('%H:%M:%S', t)
+
+    def close(self):
+        if not self.logFileHandle: return
+        if isinstance(self.logFileHandle, Workbook):
+            self.logFileHandle.save(self.fn)
+        self.logFileHandle.close()
+        self.logFileHandle = None
+        print(self.fn, 'closed')
+
+    def __del__(self):
+        self.close()
+
 
 class DbgLock(object):
     def __init__(self):
@@ -251,8 +375,7 @@ class AboutDialog(wx.Dialog):
                 '',
                 authorEmail, 
                 '',
-                appUrl,
-                *( ('', appCommitHash) if appCommitHash else ())
+                appUrl
             ]
             t = wx.TextCtrl(self, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_AUTO_URL, size = (200,200))
             t.SetValue('\n'.join(lines))
@@ -1315,6 +1438,8 @@ class Main(wx.Frame):
         self.sys_stdout = sys.stdout
         self.sys_stderr = sys.stderr
 
+        self.logger = None
+
         # debug window
         self.debugWindow = DebugWindow(self, title=f'{appName} debug window')
         self.Bind(DebugWindow.EVT_TEXTFRAME_CLOSE, self.onDebugWindowClose)
@@ -1412,14 +1537,17 @@ class Main(wx.Frame):
 
         bot_sizer = wx.BoxSizer()
         serialButton = wx.Button(self, label='Serial', name = 'serial_btn')
-        self.startStopButton = wx.Button(self, label='Start Scan', name = 'start_stop_btn')
+        self.startStopScanButton = wx.Button(self, label='Start Scan', name = 'start_stop_scan_btn')
+        self.startStopLogButton = wx.Button(self, label='Start Log', name = 'start_stop_log_btn')
         self.progressGauge = wx.Gauge(self)
         self.statusText = PulseText(self)
         bot_sizer.AddSpacer(5)
         bot_sizer.Add(serialButton)
-        bot_sizer.AddSpacer(20)
-        bot_sizer.Add(self.startStopButton)
-        bot_sizer.AddSpacer(20)
+        bot_sizer.AddSpacer(10)
+        bot_sizer.Add(self.startStopScanButton)
+        bot_sizer.AddSpacer(10)
+        bot_sizer.Add(self.startStopLogButton )
+        bot_sizer.AddSpacer(10)
         bot_sizer.Add(self.statusText, 0, lflags)
         bot_sizer.Add(self.progressGauge, 1 , wx.EXPAND | wx.LEFT, 20)
         sizer.Add(bot_sizer, 0, wx.EXPAND | wx.ALL, 5)
@@ -1529,6 +1657,8 @@ class Main(wx.Frame):
             return
 
         self.setStatus('')
+
+        self.logData(evt.basicInfo, evt.cellInfo)
 
         #sometimes we get data after stopping ...
         if self.worker.scanRunning:
@@ -1671,8 +1801,10 @@ class Main(wx.Frame):
             self.chooseSerialPort()
         elif n == 'clear_errors_btn':
             self.clearErrors()
-        elif n == 'start_stop_btn':
+        elif n == 'start_stop_scan_btn':
             self.startStopScan()
+        elif n == 'start_stop_log_btn':
+            self.startStopLog()
         elif n == 'cal_volt_ntc_btn':
             self.voltNtcCal()
         elif n == 'cal_idle_btn':
@@ -1698,20 +1830,17 @@ class Main(wx.Frame):
 
     def startStopScan(self):
         if self.worker.scanRunning:
-            self.startStopButton.Enable(False)
+            self.startStopScanButton.Enable(False)
             self.worker.stopScan()
-            self.startStopButton.SetLabel('Start Scan')
-            self.startStopButton.Enable(True)
+            self.startStopScanButton.SetLabel('Start Scan')
+            self.startStopScanButton.Enable(True)
             self.progressGauge.SetValue(0)
         else:
-            self.startStopButton.Enable(False)
+            self.startStopScanButton.Enable(False)
             self.worker.startScan()
-            self.startStopButton.SetLabel('Stop Scan')
-            self.startStopButton.Enable(True)
+            self.startStopScanButton.SetLabel('Stop Scan')
+            self.startStopScanButton.Enable(True)
             self.progressGauge.Pulse()
-
-    def setLogFile(self):
-        pass
 
     def voltNtcCal(self):
         try:
@@ -1910,6 +2039,29 @@ class Main(wx.Frame):
             except:
                 traceback.print_exc()
                 wx.LogError(f'Cannot save current data in file "{fn}".')
+
+    def startStopLog(self):
+        if not self.logger:
+            with wx.FileDialog(self, 'Log Data', wildcard='Data files (*.xls)|*.xls|CSV files (*.csv)|*.csv|All files (*.*)|*.*',
+                            style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
+
+                if fileDialog.ShowModal() == wx.ID_CANCEL: return
+                try:
+                    fn = fileDialog.GetPath()
+                    if '.' not in fn: fn += '.csv'
+                    self.logger = Logger(fn)
+                    self.startStopLogButton.SetLabel('Stop Log')
+                except:
+                    traceback.print_exc()
+                    wx.LogError(f'Cannot save current data in file "{fn}".')
+        else:
+            self.logger.close()
+            self.logger = None
+            self.startStopLogButton.SetLabel('Start Log')
+
+    def logData(self, *args, **kwargs):
+        if self.logger:
+            self.logger.log(*args, **kwargs)
 
     def clearErrors(self):
         with self.accessLock:
