@@ -44,7 +44,7 @@ def doSetup():
         maintainer='Eric Poulsen',
         maintainer_email='"Eric Poulsen" <eric@zyxod.com>',
         version='0.0.1-dev',
-        install_requires=['pyserial~=3.4', 'openpyxl~=3.0.5', 'xlsxwriter==1.3.7'],
+        install_requires=['pyserial~=3.4', 'xlsxwriter==1.3.7'],
 
         extras_require = {
             'gui': ['wxPython~=4.1.1', 'pyinstaller']
