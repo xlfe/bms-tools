@@ -19,5 +19,5 @@
 try:
     from .version import version
 except ModuleNotFoundError as e:
-    raise RuntimeError('bmstools/version.py not found; try running setup.py') from e
+    raise RuntimeError('bmstools/version.py not found; try running `setup.py --bmstools-gen-version` or `make version`') from e
 __all__=['version']
