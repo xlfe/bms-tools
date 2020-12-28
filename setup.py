@@ -22,11 +22,11 @@ setup(
     name='bmstools',
     url='https://gitlab.com/MrSurly/bms-tools.git',
     maintainer='Eric Poulsen',
-    maintainer_email='"Eric Poulsen" <eric@zyxod.com',
+    maintainer_email='"Eric Poulsen" <eric@zyxod.com>',
     version='0.0.1-dev',
-    install_requires=[
-        'pyserial~=3.4', 
-        ],
+    install_requires=['pyserial~=3.4', 'openpyxl~=3.0.5', 'numpy==1.19.3'],
+
+    ## numpy version locked because of https://tinyurl.com/y3dm3h86
     extras_require = {
         'gui': ['wxPython~=4.1.1', 'pyinstaller']
     },
