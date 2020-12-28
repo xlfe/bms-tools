@@ -1,14 +1,14 @@
-win10:build:
-  tags:
-    - win10
-  stage: build
-  script:
-    - make
-  artifacts:
-    expire_in: 1 week
-    name: "$CI_JOB_NAME"
-    paths:
-      - dist/*.exe
+#win10:build:
+#  tags:
+#    - win10
+#  stage: build
+#  script:
+#    - make
+#  artifacts:
+#    expire_in: 1 week
+#    name: "$CI_JOB_NAME"
+#    paths:
+#      - dist/*.exe
 
 #win10:release:
 #  needs: win10:build
