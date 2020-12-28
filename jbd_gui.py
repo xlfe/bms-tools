@@ -222,8 +222,8 @@ class Logger:
             self.cvConvCompat(max(cellInfo)),
             self.cvConvCompat(min(cellInfo)),
             self.pctConvCompat(basicInfo['cap_pct']),
-            self.capConvCompat(basicInfo['cycle_cap']),
-            self.capConvCompat(basicInfo['design_cap']),
+            self.capConvCompat(basicInfo['cur_cap']),
+            self.capConvCompat(basicInfo['full_cap']),
             basicInfo['cycle_cnt'],
             *[self.tempConvCompat(basicInfo[f'ntc{i}']) for i in range(ntcCnt)],
             self.boolConvCompat(basicInfo['chg_fet_en']),
@@ -651,8 +651,8 @@ class LayoutGen:
         fgs.AddMany(gen('Min V', 'cell_min_mv', 'mv'))
         fgs.AddMany(gen('Δ V', 'cell_delta_mv', 'mv'))
         fgs.AddMany(gen('Cycles', 'cycle_cnt'))
-        fgs.AddMany(gen('Capacity', 'design_cap', 'mAh'))
-        fgs.AddMany(gen('Cap Rem', 'cycle_cap', 'mAh'))
+        fgs.AddMany(gen('Capacity', 'full_cap', 'mAh'))
+        fgs.AddMany(gen('Cap Rem', 'cur_cap', 'mAh'))
         sbs.Add(RoundGauge(sb, name='cap_pct'), 1, wx.EXPAND)
         bs = wx.BoxSizer()
         sbs.Add(bs, 1, wx.EXPAND)
@@ -1697,8 +1697,8 @@ class Main(wx.Frame):
         self.set('info_cell_min_mv', cell_min_mv)
         self.set('info_cell_delta_mv', cell_delta_mv)
         self.set('info_cycle_cnt', evt.basicInfo['cycle_cnt'])
-        self.set('info_design_cap', evt.basicInfo['design_cap'])
-        self.set('info_cycle_cap', evt.basicInfo['cycle_cap'])
+        self.set('info_full_cap', evt.basicInfo['full_cap'])
+        self.set('info_cur_cap', evt.basicInfo['cur_cap'])
         self.set('info_cap_pct', evt.basicInfo['cap_pct'])
 
         self.set('info_device_name', evt.deviceInfo['device_name'])
