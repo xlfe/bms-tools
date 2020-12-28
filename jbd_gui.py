@@ -185,6 +185,8 @@ class DebugWindow(wx.Frame):
         lines = value.splitlines()
         lines = lines[-500:]
         self.txt.SetValue(''.join([i+'\n' for i in lines]))
+        self.txt.SetScrollPos(wx.VERTICAL, self.txt.GetScrollRange(wx.VERTICAL))
+        self.txt.SetInsertionPoint(-1)
 
     def stdout(self, text):
         self.txt.SetDefaultStyle(self.outStyle)
