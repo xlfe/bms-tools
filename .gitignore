@@ -3,4 +3,4 @@ dist
 *.spec
 *.egg-info
 **/__pycache__
-commit_hash.py
+bmstools/version.py
