@@ -259,8 +259,9 @@ class BitfieldReg(BaseReg):
         return struct.pack('>H', value)
 
 class StringReg(BaseReg):
-    def __init__(self, regName, adx, maxLen = 32):
+    def __init__(self, regName, adx, maxLen = 31):
         self._regName = regName
+        self.maxLen = maxLen
         self._adx = adx
         self._value = ''
 
@@ -279,8 +280,8 @@ class StringReg(BaseReg):
 
         if type(value) not in (str, bytes, bytearray):
             raise ValueError(f'value should be str, byte, or bytearray')
-        if len(value) > 30:
-            raise ValueError(f'string length should not exceed 30')
+        if len(value) > self.maxLen:
+            raise ValueError(f'string length should not exceed {self.maxLen}')
 
         self._value = value
 
@@ -290,6 +291,7 @@ class StringReg(BaseReg):
 
     def unpack(self, payload):
         l = payload[0]
+        l = min(l, self.maxLen)
         self._value = str(payload[1:1+l], 'utf-8')
 
     def __str__(self):
