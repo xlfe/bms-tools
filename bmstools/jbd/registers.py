@@ -427,8 +427,8 @@ class BasicInfoReg(BaseReg):
     _ntcFields = [f'ntc{i}' for i in range(8)]
     _fetBits = 'chg_fet_en', 'dsg_fet_en'
     _valueNames = [
-        'pack_mv', 'pack_ma', 'cycle_cap', 
-        'design_cap', 'cycle_cnt', 
+        'pack_mv', 'pack_ma', 'cur_cap', 
+        'full_cap', 'cycle_cnt', 
         'year', 'month', 'day',
         *_balBits,
         *_faultBits,
@@ -462,11 +462,11 @@ class BasicInfoReg(BaseReg):
         offset = 0
         fmt = '>HhHHHH'
         values = struct.unpack_from(fmt, payload, offset)
-        self._pack_mv, self._pack_ma, self._cycle_cap, self._design_cap, self._cycle_cnt, date_raw = values
+        self._pack_mv, self._pack_ma, self._cur_cap, self._full_cap, self._cycle_cnt, date_raw = values
         self._pack_mv *= 10
         self._pack_ma *= 10
-        self._cycle_cap *= 10
-        self._design_cap *= 10
+        self._cur_cap *= 10
+        self._full_cap *= 10
         self._year, self._month, self._day = DateParser.decode(date_raw)
         offset += struct.calcsize(fmt)
 
