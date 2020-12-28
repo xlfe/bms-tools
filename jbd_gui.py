@@ -22,8 +22,7 @@ import time
 import re
 import serial
 import serial.tools.list_ports
-from openpyxl import Workbook
-from openpyxl.cell import WriteOnlyCell
+from xlsxwriter import Workbook
 import math
 import enum
 import random
@@ -178,7 +177,7 @@ class Logger:
         self.headerWritten = False
         self.rowNum = 0
         if fn.lower().endswith('.xls') or fn.lower().endswith('.xlsx'):
-            self.logFileHandle = Workbook(write_only = True)
+            self.logFileHandle = Workbook(fn, {'constant_memory': True})
         else:
             self.logFileHandle = open(fn, 'w+')
         self.fn = fn
@@ -187,18 +186,18 @@ class Logger:
         if not self.logFileHandle: return
         h = self.logFileHandle
         if isinstance(h, Workbook):
-            print('workbook')
-            worksheets = h.worksheets
+            worksheets = h.worksheets()
             if not worksheets:
-                ws = h.create_sheet('test') # matches jbd app
+                name = os.path.basename(os.path.splitext(self.fn)[0])
+                ws = h.add_worksheet(name) 
             else:
                 ws = worksheets[0]
-            ws.append(row)
+
+            for col, data in enumerate(row):
+                ws.write(self.rowNum, col, data)
         else:
             h.write(','.join([str(i) for i in row])+'\n')
             h.flush()
-
-        print('logged', row)
 
         self.rowNum += 1
 
@@ -244,8 +243,6 @@ class Logger:
 
     def close(self):
         if not self.logFileHandle: return
-        if isinstance(self.logFileHandle, Workbook):
-            self.logFileHandle.save(self.fn)
         self.logFileHandle.close()
         self.logFileHandle = None
         print(self.fn, 'closed')
