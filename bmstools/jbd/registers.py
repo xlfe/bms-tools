@@ -259,7 +259,7 @@ class BitfieldReg(BaseReg):
         return struct.pack('>H', value)
 
 class StringReg(BaseReg):
-    def __init__(self, regName, adx, maxLen = 30):
+    def __init__(self, regName, adx, maxLen = 32):
         self._regName = regName
         self._adx = adx
         self._value = ''
