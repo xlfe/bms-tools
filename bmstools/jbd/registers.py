@@ -437,7 +437,9 @@ class BasicInfoReg(BaseReg):
         *_fetBits,
         'ntc_cnt',
         'cell_cnt',
-        *_ntcFields
+        *_ntcFields,
+        'fault_raw',
+        'bal_raw'
     ]
 
     def __init__(self, regName, adx):
@@ -470,11 +472,11 @@ class BasicInfoReg(BaseReg):
 
         fmt = '>HHHBBBBB'
         values = struct.unpack_from(fmt, payload, offset)
-        bal_raw0, bal_raw1, fault_raw, self._version, self._cap_pct, fet_raw, self._cell_cnt, self._ntc_cnt = values
-        bal_raw = bal_raw0 | (bal_raw1 << 16)
-        for fn, value in self._unpackBits(self._balBits, bal_raw):
+        bal_raw0, bal_raw1, self._fault_raw, self._version, self._cap_pct, fet_raw, self._cell_cnt, self._ntc_cnt = values
+        self._bal_raw = bal_raw0 | (bal_raw1 << 16)
+        for fn, value in self._unpackBits(self._balBits, self._bal_raw):
             setattr(self, fn, value)
-        for fn, value in self._unpackBits(self._faultBits, fault_raw):
+        for fn, value in self._unpackBits(self._faultBits, self._fault_raw):
             setattr(self, fn, value)
         for fn, value in self._unpackBits(self._fetBits, fet_raw):
             setattr(self, fn, value)
