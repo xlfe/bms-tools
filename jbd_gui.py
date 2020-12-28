@@ -185,6 +185,8 @@ class DebugWindow(wx.Frame):
         lines = value.splitlines()
         lines = lines[-500:]
         self.txt.SetValue(''.join([i+'\n' for i in lines]))
+        self.txt.SetScrollPos(wx.VERTICAL, self.txt.GetScrollRange(wx.VERTICAL))
+        self.txt.SetInsertionPoint(-1)
 
     def stdout(self, text):
         self.txt.SetDefaultStyle(self.outStyle)
@@ -419,6 +421,7 @@ class BoolImage(SVGImage):
 class LayoutGen: 
     def __init__(self, parent):
         tc = wx.TextCtrl(parent)
+        self.txtSize31 = tc.GetSizeFromTextSize(parent.GetTextExtent('9' * 31))
         self.txtSize30 = tc.GetSizeFromTextSize(parent.GetTextExtent('9' * 30))
         self.txtSize25 = tc.GetSizeFromTextSize(parent.GetTextExtent('9' * 25))
         self.txtSize20 = tc.GetSizeFromTextSize(parent.GetTextExtent('9' * 20))
@@ -917,26 +920,38 @@ class LayoutGen:
         sbs.Add(fgs, 0, *defaultBorder)
 
         d = wx.BoxSizer()
+        year = wx.TextCtrl(sb, name='year', size=self.txtSize4)
+        month = wx.TextCtrl(sb, name='month', size=self.txtSize2)
+        day = wx.TextCtrl(sb, name='day', size=self.txtSize2)
+        year.SetMaxLength(4)
+        month.SetMaxLength(2)
+        day.SetMaxLength(2)
         d.AddMany([
-            (wx.TextCtrl(sb, name='year', size=self.txtSize4), 0, a),
+            (year, 0, a),
             (wx.StaticText(sb,label='-'), 0, a),
-            (wx.TextCtrl(sb, name='month', size=self.txtSize2), 0, a),
+            (month, 0, a),
             (wx.StaticText(sb,label='-'), 0, a),
-            (wx.TextCtrl(sb, name='day', size=self.txtSize2), 0, a),
+            (day, 0, a),
         ])
+
+        mfg_name = wx.TextCtrl(sb, name='mfg_name', size=self.txtSize31)
+        device_name = wx.TextCtrl(sb, name='device_name', size=self.txtSize31)
+        barcode = wx.TextCtrl(sb, name='barcode', size=self.txtSize31)
+        for c in (mfg_name, device_name, barcode):
+            c.SetMaxLength(31)
 
         fgs.AddMany([
             (wx.StaticText(sb, label='Mfg Name'), 0, a),
-            (wx.TextCtrl(sb, name='mfg_name', size=self.txtSize20), 0, a),
+            (mfg_name, 0, a),
 
             (wx.StaticText(sb, label='Device Name'), 0, a),
-            (wx.TextCtrl(sb, name='device_name', size=self.txtSize30), 0, a),
+            (device_name, 0, a),
 
             (wx.StaticText(sb, label='Mfg Date'), 0, a),
             d,
 
             (wx.StaticText(sb, label='Barcode'), 0, a),
-            (wx.TextCtrl(sb, name='barcode', size=self.txtSize20), 0, a),
+            (barcode, 0, a),
         ])
 
     def controlConfigLayout(self, parent, sizer, colGap, boxGap):
