@@ -16,13 +16,16 @@ VERSION_FILE=bmstools/version.py
 
 all: gui
 
+version: $(VERSION_FILE)
+
 $(COMMIT_HASH_PYTHON):
 	echo \#!/usr/bin/env python > $@
 	echo commit_hash = \'$(COMMIT_HASH)\' >> $@
 	echo tag = \'$(EXACT_TAG)\' >> $@
 
 $(VERSION_FILE): FORCE
-	genVersionFile.py
+	./setup.py --bmstools-gen-version
+	
 
 FORCE:
 
