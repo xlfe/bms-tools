@@ -1900,13 +1900,13 @@ class Main(wx.Frame):
 
     def startStopLog(self):
         if not self.logger:
-            with wx.FileDialog(self, 'Log Data', wildcard='Data files (*.xls)|*.xls|CSV files (*.csv)|*.csv|All files (*.*)|*.*',
+            with wx.FileDialog(self, 'Log Data', wildcard='Data files (*.xlsx)|*.xlsx|CSV files (*.csv)|*.csv|All files (*.*)|*.*',
                             style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT) as fileDialog:
 
                 if fileDialog.ShowModal() == wx.ID_CANCEL: return
                 try:
                     fn = fileDialog.GetPath()
-                    if '.' not in fn: fn += '.csv'
+                    if '.' not in fn: fn += '.xlsx'
                     self.logger = Logger(fn)
                     self.startStopLogButton.SetLabel('Stop Log')
                 except:
