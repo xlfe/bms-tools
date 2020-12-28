@@ -146,7 +146,6 @@ class Logger:
     def __del__(self):
         self.close()
 
-
 class DbgLock(object):
     def __init__(self):
         self._lock = threading.Lock()
