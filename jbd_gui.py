@@ -1525,7 +1525,7 @@ class Main(wx.Frame):
     def onScanData(self, evt):
 
         if hasattr(evt, 'err'):
-            print(''.join(traceback.format_tb(evt.err.__traceback__)), file = sys.stderr)
+            print(''.join(traceback.format_tb(evt.err.__traceback__)))
             self.setStatus('Scan Error')
             return
 
