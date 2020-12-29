@@ -67,6 +67,7 @@ class JBD:
         self._lock = threading.RLock()
         self.timeout = timeout
         self.debug = debug
+        self.clearErrors = False
 
         self.eeprom_regs = [
             ### EEPROM settings
@@ -234,8 +235,12 @@ class JBD:
         self.enterFactory()
 
     def __exit__(self, type, value, traceback):
-        self.exitFactory()
+        self.exitFactory(self.clearErrors)
         self.close()
+
+    def factoryContext(self, clearErrors = False):
+        self.clearErrors = clearErrors
+        return self
 
     def enterFactory(self):
         try:
@@ -266,7 +271,7 @@ class JBD:
             self.close()
 
     def readEeprom(self, progressFunc = None):
-        with self:
+        with self.factoryContext():
             ret = {}
             numRegs = len(self.eeprom_regs)
             if progressFunc: progressFunc(0)
@@ -283,7 +288,7 @@ class JBD:
             return ret
 
     def writeEeprom(self, data, progressFunc = None):
-        with self:
+        with self.factoryContext():
             ret = {}
             numRegs = len(self.eeprom_regs)
             if progressFunc: progressFunc(0)
@@ -369,16 +374,12 @@ class JBD:
             self.close()
     
     def clearErrors(self):
-        try:
-            self.open()
-            self.enterFactory()
-            self.exitFactory(True)
-        finally:
-            self.close()
+        with self.factoryContext(True):
+            pass
 
     def calCell(self, cells, progressFunc = None):
         'cells is a dict of cell # (base 0) to mV'
-        with self:
+        with self.factoryContext():
             cur = 0
             cnt = len(cells)
             for n, v in cells.items():
@@ -397,12 +398,7 @@ class JBD:
 
     def calNtc(self, ntc, progressFunc = None):
         'ntc is a dict of ntc # (base 0) to K'
-        with self:
-            self.enterFactory()
-            self.open()
-            self.debug = 0
-            self.timeout = 5
-
+        with self.factoryContext():
             cur = 0
             cnt = len(ntc)
             for n, v in ntc.items():
@@ -420,7 +416,7 @@ class JBD:
                 cur += 1
 
     def calIdleCurrent(self):
-        with self:
+        with self.factoryContext():
             reg = IntReg('ma', self.I_CAL_IDLE_REG, Unit.MA, 10)
             reg.set('ma', 0)
             cmd = self.writeCmd(self.I_CAL_IDLE_REG, reg.pack())
@@ -430,7 +426,7 @@ class JBD:
             if payload is None: raise TimeoutError()
 
     def calChgCurrent(self, value):
-        with self:
+        with self.factoryContext(True):
             reg = IntReg('ma', self.I_CAL_CHG_REG, Unit.MA, 10)
             reg.set('ma', value)
             cmd = self.writeCmd(reg.adx, reg.pack())
@@ -440,7 +436,7 @@ class JBD:
             if payload is None: raise TimeoutError()
 
     def calDsgCurrent(self, value):
-        with self:
+        with self.factoryContext(True):
             reg = IntReg('ma', self.I_CAL_DSG_REG, Unit.MA, 10)
             reg.set('ma', value)
             cmd = self.writeCmd(reg.adx, reg.pack())
@@ -453,7 +449,7 @@ class JBD:
         ce = 0 if chgEnable else 1
         de = 0 if dsgEnable else 1
         value = ce | (de << 1)
-        with self:
+        with self.factoryContext():
             reg = IntReg('x', self.CHG_DSG_EN_REG, Unit.NONE, 1)
             reg.set('x', value)
             cmd = self.writeCmd(reg.adx, reg.pack())
@@ -476,6 +472,7 @@ class JBD:
             pass
 
     def _balTestWrite(self, value):
+        # Intentionally don't exit factory here
         try:
             self.open()
             self.enterFactory()
@@ -490,7 +487,7 @@ class JBD:
             self.close()
 
     def setPackCapRem(self, value):
-        with self:
+        with self.factoryContext():
             reg = IntReg('mah', self.CAP_REM_REG, Unit.MAH, 10)
             reg.set('mah', value)
             cmd = self.writeCmd(reg.adx, reg.pack())
@@ -500,7 +497,7 @@ class JBD:
             if payload is None: raise TimeoutError()
 
     def readIntReg(self, adx):
-        with self:
+        with self.factoryContext():
             reg = IntReg('x', adx, Unit.NONE, 1)
             cmd = self.readCmd(reg.adx, reg.pack())
             self.s.write(cmd)
@@ -511,7 +508,7 @@ class JBD:
             return reg.get('x')
 
     def writeIntReg(self, adx, value):
-        with self:
+        with self.factoryContext():
             reg = IntReg('x', adx, Unit.NONE, 1)
             reg.set('x', int(value))
             cmd = self.writeCmd(reg.adx, reg.pack())
