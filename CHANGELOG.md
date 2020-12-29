@@ -9,6 +9,7 @@
 * Feature: Temp calibration
 * Feature: charge/discharge/idle current calibration
 * Feature: XLSX and CSV Logging
+* Fix: Increased string register lengths to 31 bytes
 * Fix: Renamed cycle_cap and design_cap for basic info
 * Fix: Limited debug window text size
 

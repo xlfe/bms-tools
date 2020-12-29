@@ -29,16 +29,16 @@ I've compiled some [JBD register documentation](JBD_REGISTER_MAP.md), and at the
     <td>EEPROM Settings</td><td bgcolor="green"><font color="white">Full support</font></td>
   </tr>
   <tr>
-    <td>Calibration</td><td bgcolor="green"><font color="black">Full support</font></td>
+    <td>Calibration</td><td bgcolor="green"><font color="white">Full support</font></td>
   </tr>
   <tr>
-    <td>MOS Control, Remaining capacity edit, balance control</td><td bgcolor="green"><font color="black">Full support</font></td>
+    <td>MOS Control, Remaining capacity edit, balance control</td><td bgcolor="green"><font color="white">Full support</font></td>
   </tr>
   <tr>
-    <td>Logging</td><td bgcolor="yellow"><font color="black">In progress</font></td>
+    <td>Logging</td><td bgcolor="green"><font color="white">Full support</font></td>
   </tr>
   <tr>
-    <td>Graphing</td><td bgcolor="#808080"><font color="black">Planned</font></td>
+    <td>Graphing</td><td bgcolor="#808080"><font color="white">Planned</font></td>
   </tr>
   <tr>
     <td>Firmware update</td><td bgcolor="red"><font color="white">Not planned</text></td>
