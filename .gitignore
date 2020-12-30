@@ -7,3 +7,4 @@ bmstools/version.py
 *.csv
 *.xls
 *.xlsx
+*.fig
