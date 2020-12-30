@@ -313,7 +313,7 @@ class SerialPortDialog(wx.Dialog):
             self.refresh()
             return
 
-        self.selectedPort = serial.Serial()
+        self.selectedPort = None
         i = self.portBox.GetSelection()
         if i != wx.NOT_FOUND:
             self.selectedPort = self.ports[i].device
@@ -1334,7 +1334,11 @@ class Main(wx.Frame):
             config.DeleteAll()
             config.Flush()
 
-        port = self.getLastSerialPort()
+
+        if cli_args.port:
+            port = serial.Serial(cli_args.port)
+        else:
+            port = self.getLastSerialPort()
         print(f'Using port: {port.name or "None"} {repr(port)}')
         self.j = jbd.JBD(port)
         self.accessLock = LockClass()
@@ -1498,13 +1502,14 @@ class Main(wx.Frame):
             if d.ShowModal() == wx.ID_CANCEL:
                 return
             self.j.serial.port = d.selectedPort
-            config = wx.Config.Get() 
-            config.Write('serial_port', self.j.serial.port)
-            config.Flush()
+            if self.j.serial.port is not None:
+                config = wx.Config.Get() 
+                config.Write('serial_port', self.j.serial.port)
+                config.Flush()
             self.updateSerialPort()
 
     def updateSerialPort(self):
-        self.FindWindowByName('serial_btn').SetLabel(self.j.serial.port)
+        self.FindWindowByName('serial_btn').SetLabel(str(self.j.serial.port))
 
     def getLastSerialPort(self):
         ports = serial.tools.list_ports.comports()
@@ -2117,6 +2122,7 @@ if __name__ == "__main__":
     p.add_argument('-c', '--clear-config', action='store_true')
     p.add_argument('-w', '--no-warning', action='store_true')
     p.add_argument('-t', '--tab')
+    p.add_argument('-p', '--port')
     cli_args = p.parse_args()
 
     app = JBDApp(cli_args = cli_args)
