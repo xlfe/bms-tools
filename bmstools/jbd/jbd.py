@@ -67,7 +67,7 @@ class JBD:
         self._lock = threading.RLock()
         self.timeout = timeout
         self.debug = debug
-        self.clearErrors = False
+        self.clearErrorsOnExit = False
 
         self.eeprom_regs = [
             ### EEPROM settings
@@ -235,11 +235,11 @@ class JBD:
         self.enterFactory()
 
     def __exit__(self, type, value, traceback):
-        self.exitFactory(self.clearErrors)
+        self.exitFactory(self.clearErrorsOnExit)
         self.close()
 
     def factoryContext(self, clearErrors = False):
-        self.clearErrors = clearErrors
+        self.clearErrorsOnExit = clearErrors 
         return self
 
     def enterFactory(self):
