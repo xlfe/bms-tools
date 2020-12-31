@@ -304,7 +304,6 @@ class JBD:
                     print(f'skipping read-only valueName {valueName}')
 
             for i,reg in enumerate(regs):
-                print('reg', reg.regName)
                 data = reg.pack()
                 cmd = self.writeCmd(reg.adx, data)
                 self.s.write(cmd)

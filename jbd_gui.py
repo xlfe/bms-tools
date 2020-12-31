@@ -1635,12 +1635,13 @@ class Main(wx.Frame):
         if w is None:
             print(f'set: unknown field: {name}')
             return
-        if (isinstance(w, wx.TextCtrl) or 
-            isinstance(w, RoundGauge) or 
-            isinstance(w, wx.SpinCtrlDouble)):
+        if isinstance(w, wx.TextCtrl):
             w.SetValue(svalue)
         elif isinstance(w, wx.StaticText):
             w.SetLabel(svalue)
+        elif (isinstance(w, wx.SpinCtrlDouble) or
+              isinstance(w, RoundGauge)):
+            w.SetValue(float(value))
         elif (isinstance(w, BoolImage) or 
               isinstance(w, wx.CheckBox) or 
               isinstance(w, BetterChoice)):
