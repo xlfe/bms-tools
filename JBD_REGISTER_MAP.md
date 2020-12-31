@@ -541,7 +541,7 @@ Write the byte sequence 0x28, 0x28 to exit "Factory Mode," update the values in 
      <td>U16</td>
      <td>10 mV</td>
      <td>puvp_rel</td>
-     <td>Pack voltage must rise above this value to release overvoltage condition</td>
+     <td>Pack voltage must rise above this value to release undervoltage condition</td>
     </tr>
     <tr>
      <td>0x3C</td>
@@ -590,7 +590,7 @@ Write the byte sequence 0x28, 0x28 to exit "Factory Mode," update the values in 
      <td>U16</td>
      <td>1 mV</td>
      <td>cuvp_rel</td>
-     <td>Cell voltage must rise above this value to release overvoltage condition</td>
+     <td>Cell voltage must rise above this value to release undervoltage condition</td>
     </tr>
     <tr>
      <td>0x3D</td>
