@@ -41,7 +41,10 @@ I've compiled some [JBD register documentation](JBD_REGISTER_MAP.md), and at the
     <td>Graphing</td><td bgcolor="#808080"><font color="white">Planned</font></td>
   </tr>
   <tr>
-    <td>Firmware update</td><td bgcolor="red"><font color="white">Not planned</text></td>
+    <td>BLE Support</td><td bgcolor="orange"><font color="black">Investigating</font></td>
+  </tr>
+  <tr>
+    <td>Firmware update</td><td bgcolor="red"><font color="black">Not planned</text></td>
   </tr>
 </table>
 
