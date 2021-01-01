@@ -62,6 +62,14 @@ defaultBorder = wx.EXPAND | wx.TOP | wx.BOTTOM | wx.LEFT | wx.RIGHT, 7
 colGap = (10,1)
 boxGap = (3,3)
 
+
+class FieldAnnotation:
+    def __init__(self, fieldName = None, fieldLabel = None, range = None, tooltip = None):
+        self.fieldName = fieldName
+        self.fieldLabel = fieldLabel
+        self.range = range
+        self.tooltip = tooltip
+
 cellRange   = (0, 65536, 100)
 packRange   = (0, 655350, 100)
 tempRange   = (-273.15, 6316.4, 1)
@@ -69,61 +77,64 @@ mahRange     = (0, 655350, 1000)
 chgRange    = (0, 327670, 100)
 dsgRange    = (-327680, 0, 100)
 delayRange  = (0, 255, 1)
-ranges = {
-    'covp':         cellRange,
-    'covp_rel':     cellRange,
-    'covp_delay':   delayRange,
-    'cuvp':         cellRange,
-    'cuvp_rel':     cellRange,
-    'cuvp_delay':   delayRange,
-    'povp':         packRange,
-    'povp_rel':     packRange,
-    'povp_delay':   delayRange,
-    'puvp':         packRange,
-    'puvp_rel':     packRange,
-    'chgot':        tempRange,
-    'chgot_rel':    tempRange,
-    'chgot_delay':  delayRange,
-    'chgut':        tempRange,
-    'chgut_rel':    tempRange,
-    'chgut_delay':  delayRange,
-    'dsgot':        tempRange,
-    'dsgot_rel':    tempRange,
-    'dsgot_delay':  delayRange,
-    'dsgut':        tempRange,
-    'dsgut_rel':    tempRange,
-    'dsgut_delay':  delayRange,
 
-    'chgoc':        chgRange,
-    'chgoc_rel':    delayRange,
-    'chgoc_delay':  delayRange,
-    'dsgoc':        dsgRange,
-    'dsgoc_rel':    delayRange,
-    'dsgoc_delay':  delayRange,
+fa = FieldAnnotation
+field_annotations = [
+    fa('covp', range=cellRange, tooltip='cell over volt protection'),
+    fa('covp_rel', range=cellRange, tooltip='cell over volt protection release'),
+    fa('covp_delay', range=delayRange, tooltip='cell over volt protection delay'),
+    fa('cuvp', range=cellRange, tooltip='cell under volt protection'),
+    fa('cuvp_rel', range=cellRange, tooltip='cell under volt protection release'),
+    fa('cuvp_delay', range=delayRange, tooltip='cell under volt protection delay'),
+    fa('povp', range=packRange, tooltip='pack over volt protection'),
+    fa('povp_rel', range=packRange, tooltip='pack over volt protection release'),
+    fa('povp_delay', range=delayRange, tooltip='pack over volt protection delay'),
+    fa('puvp', range=packRange, tooltip='pack under volt protection'),
+    fa('puvp_rel', range=packRange, tooltip='pack under volt protection release'),
+    fa('puvp_delay', range=delayRange, tooltip='pack under volt protection delay'),
+    fa('chgot', range=tempRange, tooltip='charge over temp'),
+    fa('chgot_rel', range=tempRange, tooltip='charge over temp release'),
+    fa('chgot_delay', range=delayRange, tooltip='charge over temp delay'),
+    fa('chgut', range=tempRange, tooltip='charge under temp'),
+    fa('chgut_rel', range=tempRange, tooltip='charge under temp release'),
+    fa('chgut_delay', range=delayRange, tooltip='charge under temp delay'),
+    fa('dsgot', range=tempRange, tooltip='discharge over temp'),
+    fa('dsgot_rel', range=tempRange, tooltip='discharge over temp release'),
+    fa('dsgot_delay', range=delayRange, tooltip='discharge over temp delay'),
+    fa('dsgut', range=tempRange, tooltip='discharge under temp'),
+    fa('dsgut_rel', range=tempRange, tooltip='discharge under temp release'),
+    fa('dsgut_delay', range=delayRange, tooltip='discharge under tempdelay'),
+ 
+    fa('chgoc', range=chgRange, tooltip='charge over current'),
+    fa('chgoc_rel', range=delayRange, tooltip='charge over current release'),
+    fa('chgoc_delay', range=delayRange, tooltip='charge over current delay'),
+    fa('dsgoc', range=dsgRange, tooltip='discharge over current'),
+    fa('dsgoc_rel', range=delayRange, tooltip='discharge over current release'),
+    fa('dsgoc_delay', range=delayRange, tooltip='discharge over current delay'),
 
-    'covp_high':    cellRange,
-    'cuvp_high':    cellRange,
+    fa('covp_high', range=cellRange, tooltip='cell over volt protection'),
+    fa('cuvp_high', range=cellRange, tooltip='cell under volt protection'),
 
-    'bal_start':    cellRange,
-    'bal_window':   (*cellRange[:2], 10),
+    fa('bal_start', range=cellRange, tooltip='balance start voltage: start balancing when above this threshold'),
+    fa('bal_window', range=(*cellRange[:2], 10), tooltip='balance window: enable balancing if voltage is outside this window'),
 
-    'design_cap':   mahRange,
-    'cycle_cap':    mahRange,
-    'dsg_rate':     (0.0, 100.0, .1),
-    'fet_ctrl':     (0, 65535, 1),
-    'led_timer':    (0, 65535, 1),
+    fa('design_cap', range=mahRange, tooltip='design capacity'),
+    fa('cycle_cap', range=mahRange, tooltip='cycle capacity'),
+    fa('dsg_rate', range=(0.0, 100.0, .1), tooltip='self discharge rate'),
+    fa('fet_ctrl', range=(0, 65535, 1), tooltip=''),
+    fa('led_timer', range=(0, 65535, 1), tooltip=''),
 
-    'cap_100':      cellRange,
-    'cap_80':       cellRange,
-    'cap_60':       cellRange,
-    'cap_40':       cellRange,
-    'cap_20':       cellRange,
-    'cap_0':        cellRange,
+    fa('cap_100', range=cellRange, tooltip='full cell voltage'),
+    fa('cap_80', range=cellRange, tooltip='80% cell voltage'),
+    fa('cap_60', range=cellRange, tooltip='60% cell voltage'),
+    fa('cap_40', range=cellRange, tooltip='40% cell voltage'),
+    fa('cap_20', range=cellRange, tooltip='20% cell voltage'),
+    fa('cap_0', range=cellRange, tooltip='empty cell voltage'),
 
-
-    'cycle_cnt':    (0, 65535, 1),
-    'shunt_res':    (0.0, 6553.5, .1),
-}
+    fa('cycle_cnt', range=(0, 65535, 1), tooltip='cycle count'),
+    fa('shunt_res', range=(0.0, 6553.5, .1), tooltip='shunt resistor'),
+]
+del fa
 
 LockClass = threading.Lock
 
@@ -1388,19 +1399,27 @@ class Main(wx.Frame):
 
         for c in ChildIter.iterNamed(self.calTab):
             c.Name = 'cal_' + c.Name
+        
+        # apply field annotations
 
-        for name, r in ranges.items():
-            name = 'eeprom_'+name
-            w = self.FindWindowByName(name)
+        children_by_name = {c.Name:c for c in ChildIter.iterNamed(self)}
+        children_by_label = {c.GetLabel() for c in children_by_name.values()}
+        for fa in field_annotations:
+            fieldName = 'eeprom_'+fa.fieldName
+            w = self.FindWindowByName(fieldName)
             if not w:
-                print(f'unknown control {name}')
+                print(f'unknown control {fieldName}')
                 continue
-            try:
-                min, max, increment = r
-                w.SetRange(min, max)
-                w.SetIncrement(increment)
-            except Exception as e:
-                print(f'unable to call SetRange on {name}')
+            if fa.tooltip:
+                w.SetToolTip(fa.tooltip)
+
+            if fa.range:
+                try:
+                    min, max, increment = fa.range
+                    w.SetRange(min, max)
+                    w.SetIncrement(increment)
+                except Exception as e:
+                    print(f'unable to call SetRange on {fieldName}')
 
         nb_sizer = wx.BoxSizer()
         nb_sizer.Add(nb, 1, wx.EXPAND | wx.ALL, 5)
