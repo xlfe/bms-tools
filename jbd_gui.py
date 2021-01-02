@@ -369,12 +369,11 @@ class EnumChoice(BetterChoice):
         return self.__enum_cls.byDisplay(int(s))
 
 class SVGImage(wx.Panel):
-    def __init__(self, parent, img, name):
+    def __init__(self, parent, img, name = 'SvgImage'):
         super().__init__(parent, name = name)
-        self.reqWidth = None
-        self.reqHeight = None
         self.Bind(wx.EVT_PAINT, self.OnPaint)
         self.SetImage(img)
+        self.Bind(wx.EVT_SIZE, self.onSize)
         self.Refresh()
 
     def SetImage(self, img):
@@ -384,22 +383,15 @@ class SVGImage(wx.Panel):
             self.img = wx.svg.SVGimage.CreateFromFile(img)
         self.Refresh()
 
-    def SetReqSize(self, width, height):
-        self.reqWidth = width
-        self.reqHeight = height
+    def onSize(self, evt):
+        w,h = self.Size
+        if any([i < 2 for i in (w,h)]):
+            w = h = max(w,h)
+            self.SetMinSize((w,h))
 
     def OnPaint(self, event):
-        w,h = self.Size
-        if self.reqWidth is not None:
-            w = self.reqWidth
-        if self.reqHeight is not None:
-            h = self.reqHeight
-        self.SetSize(w,h)
-        
-
         dc = wx.PaintDC(self)
         dc.SetBackground(wx.Brush(wx.GREEN, wx.TRANSPARENT))
-        #dc.SetBackground(wx.Brush(wx.GREEN))
         dc.Clear()
         hscale = self.Size.width / self.img.width
         vscale = self.Size.height / self.img.height
@@ -666,12 +658,15 @@ class LayoutGen:
     ####
 
     def settingsTabLayout(self, tab):
-        boxSizer  = wx.BoxSizer(wx.HORIZONTAL)
-        tab.SetSizer(boxSizer)
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        tab.SetSizer(vbox)
+
+        hbox  = wx.BoxSizer(wx.HORIZONTAL)
+        vbox.Add(hbox)
         col1Sizer = wx.BoxSizer(wx.VERTICAL)
         col2Sizer = wx.FlexGridSizer(1)
         col3Sizer = wx.FlexGridSizer(1)
-        boxSizer.AddMany([col1Sizer, col2Sizer, col3Sizer])
+        hbox.AddMany([col1Sizer, col2Sizer, col3Sizer])
 
         self.basicConfigLayout(tab, col1Sizer, colGap, boxGap)
         self.highProtectConfigLayout(tab, col1Sizer, colGap, boxGap)
@@ -679,9 +674,12 @@ class LayoutGen:
         self.ntcConfigLayout(tab, col2Sizer, colGap, boxGap)
         self.balanceConfigLayout(tab, col2Sizer, colGap, boxGap)
         self.otherConfigLayout(tab, col2Sizer, colGap, boxGap)
-        self.controlConfigLayout(tab, col2Sizer, colGap, boxGap)
         self.capacityConfigLayout(tab, col3Sizer, colGap, boxGap)
         self.faultCountsLayout(tab, col3Sizer, colGap, boxGap)
+
+        hbox  = wx.BoxSizer(wx.HORIZONTAL)
+        vbox.Add(hbox, 1, wx.EXPAND)
+        self.controlConfigLayout(tab, hbox, colGap, boxGap)
 
         tab.Layout()
         tab.Fit()
@@ -903,12 +901,12 @@ class LayoutGen:
             (wx.StaticText(sb, label = 'mΩ'), 0, a),
         ])
         s2.AddMany([ 
-                (BetterChoice(sb, choices = [str(i) for i in range(1,17)], name='cell_cnt'), 0, a),
+                (BetterChoice(sb, choices = [str(i) for i in range(1,33)], name='cell_cnt'), 0, a),
         ])
         fgs.AddMany([
-            (wx.StaticText(sb, label = 'Shunt res'), 0, a), (s1,), 
+            (wx.StaticText(sb, label = 'Shunt res'), 0, a | wx.ALIGN_RIGHT), (s1,), 
             (0,0),
-            (wx.StaticText(sb, label = 'Cell cnt'), 0, a), (s2,)
+            (wx.StaticText(sb, label = 'Cell cnt'), 0, a | wx.ALIGN_RIGHT), (s2,)
             ])
 
         s1 = wx.BoxSizer()
@@ -969,26 +967,58 @@ class LayoutGen:
         panel = wx.Panel(parent)
         sb = wx.StaticBox(panel, label='Control')
         sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
-        fgs = wx.FlexGridSizer(3, gap=boxGap)
-        fgs.AddGrowableCol(1)
+        bs = wx.BoxSizer()
         a = wx.ALIGN_CENTER_VERTICAL
-        sbs.Add(fgs, 0, *defaultBorder)
+        #sbs.Add(bs, 1, *defaultBorder)
+        sbs.Add(bs, 1, wx.EXPAND)
         panel.SetSizer(sbs)
         sizer.Add(panel, 1, *defaultBorder)
 
-        read_btn = wx.Button(sb, label='Read EEPROM', name='read_eeprom_btn')
-        write_btn = wx.Button(sb, label='Write EEPROM', name='write_eeprom_btn')
-        load_btn = wx.Button(sb, label='Load EEPROM', name='load_eeprom_btn')
-        save_btn = wx.Button(sb, label='Save EEPROM', name='save_eeprom_btn')
+        read_btn = wx.Button(sb, label='Read settings From BMS', name='read_eeprom_btn')
+        write_btn = wx.Button(sb, label='Write settings to BMS', name='write_eeprom_btn')
+        load_btn = wx.Button(sb, label='Load settings from file', name='load_eeprom_btn')
+        save_btn = wx.Button(sb, label='Save settings to file', name='save_eeprom_btn')
         write_btn.Enable(False)
         save_btn.Enable(False)
 
-        fgs.Add(read_btn, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
-        fgs.Add(0,0)
-        fgs.Add(write_btn, 0, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
-        fgs.Add(load_btn, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
-        fgs.Add(0,0)
-        fgs.Add(save_btn, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
+
+
+        #batt_svg.SetMinSize((20,20))
+        box = wx.FlexGridSizer(11)
+        #bs.Add(box, 1, wx.EXPAND)
+        bs.Add(box)
+
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'battery_icon_h.svg')), 1 , wx.EXPAND)
+        box.Add(5,1)
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'arrow_right.svg')), 1, wx.EXPAND)
+        box.Add(5,1)
+        box.Add(read_btn, 1, wx.EXPAND)
+
+        box.Add(15,1)
+
+        box.Add(write_btn, 1, wx.EXPAND)
+        box.Add(5,1)
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'arrow_right.svg')), 1, wx.EXPAND)
+        box.Add(5,1)
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'battery_icon_h.svg')), 1 , wx.EXPAND)
+
+        bs.AddStretchSpacer()
+
+        box = wx.FlexGridSizer(11)
+        bs.Add(box)
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'floppy.svg')), 1, wx.EXPAND)
+        box.Add(5,1)
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'arrow_right.svg')), 1, wx.EXPAND)
+        box.Add(5,1)
+        box.Add(load_btn, 1, wx.EXPAND)
+
+        box.Add(15,1)
+
+        box.Add(save_btn, 1, wx.EXPAND)
+        box.Add(5,1)
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'arrow_right.svg')), 1, wx.EXPAND)
+        box.Add(5,1)
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'floppy.svg')), 1, wx.EXPAND)
 
     def capacityConfigLayout(self, parent, sizer, colGap, boxGap):
         panel = wx.Panel(parent)
@@ -1284,6 +1314,7 @@ class ChildIter:
         'staticText', 
         'panel', 
         'GridWindow', 
+        'SvgImage', 
         'text', 
         'wxSpinButton',
         'groupBox', 

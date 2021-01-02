@@ -2,7 +2,7 @@
 
 ## Screenshots
 
-<a href="img/windows-info-screenshot.png"><img src="img/windows-info-screenshot.png" width="250"/></a><br>
+<a href="doc_img/windows-info-screenshot.png"><img src="doc_img/windows-info-screenshot.png" width="250"/></a><br>
 Windows version, cell info tab.
 
 [More Screenhots](SCREENSHOTS.md)
