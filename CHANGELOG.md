@@ -2,6 +2,10 @@
 
 ## Changelog
 
+### v1.1.1 2020-12-31
+
+* Fix for temp field decimal indicator problems based on locale
+
 ### v1.1.0 2020-12-28
 
 * Ended beta

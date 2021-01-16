@@ -67,7 +67,7 @@ class JBD:
         self._lock = threading.RLock()
         self.timeout = timeout
         self.debug = debug
-        self.clearErrorsOnExit = False
+        self.writeNVMOnExit = False
 
         self.eeprom_regs = [
             ### EEPROM settings
@@ -235,11 +235,12 @@ class JBD:
         self.enterFactory()
 
     def __exit__(self, type, value, traceback):
-        self.exitFactory(self.clearErrorsOnExit)
+        self.exitFactory(self.writeNVMOnExit)
+        self.writeNVMOnExit = False
         self.close()
 
-    def factoryContext(self, clearErrors = False):
-        self.clearErrorsOnExit = clearErrors 
+    def factoryContext(self, writeNVMOnExit = False):
+        self.writeNVMOnExit = writeNVMOnExit 
         return self
 
     def enterFactory(self):
@@ -260,10 +261,10 @@ class JBD:
         finally:
             self.close()
 
-    def exitFactory(self, clearErrors = False):
+    def exitFactory(self, writeNVM = False):
         try:
             self.open()
-            cmd = self.writeCmd(1,  [0x28, 0x28] if clearErrors else [0,0])
+            cmd = self.writeCmd(1,  [0x28, 0x28] if writeNVM else [0,0])
             self.s.write(cmd)
             ok, d = self.readPacket()
             return ok
@@ -288,7 +289,7 @@ class JBD:
             return ret
 
     def writeEeprom(self, data, progressFunc = None):
-        with self.factoryContext():
+        with self.factoryContext(True):
             ret = {}
             numRegs = len(self.eeprom_regs)
             if progressFunc: progressFunc(0)
@@ -304,7 +305,6 @@ class JBD:
                     print(f'skipping read-only valueName {valueName}')
 
             for i,reg in enumerate(regs):
-                print('reg', reg.regName)
                 data = reg.pack()
                 cmd = self.writeCmd(reg.adx, data)
                 self.s.write(cmd)

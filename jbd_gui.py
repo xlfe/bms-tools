@@ -62,6 +62,14 @@ defaultBorder = wx.EXPAND | wx.TOP | wx.BOTTOM | wx.LEFT | wx.RIGHT, 7
 colGap = (10,1)
 boxGap = (3,3)
 
+
+class FieldAnnotation:
+    def __init__(self, fieldName = None, fieldLabel = None, range = None, tooltip = None):
+        self.fieldName = fieldName
+        self.fieldLabel = fieldLabel
+        self.range = range
+        self.tooltip = tooltip
+
 cellRange   = (0, 65536, 100)
 packRange   = (0, 655350, 100)
 tempRange   = (-273.15, 6316.4, 1)
@@ -69,61 +77,64 @@ mahRange     = (0, 655350, 1000)
 chgRange    = (0, 327670, 100)
 dsgRange    = (-327680, 0, 100)
 delayRange  = (0, 255, 1)
-ranges = {
-    'covp':         cellRange,
-    'covp_rel':     cellRange,
-    'covp_delay':   delayRange,
-    'cuvp':         cellRange,
-    'cuvp_rel':     cellRange,
-    'cuvp_delay':   delayRange,
-    'povp':         packRange,
-    'povp_rel':     packRange,
-    'povp_delay':   delayRange,
-    'puvp':         packRange,
-    'puvp_rel':     packRange,
-    'chgot':        tempRange,
-    'chgot_rel':    tempRange,
-    'chgot_delay':  delayRange,
-    'chgut':        tempRange,
-    'chgut_rel':    tempRange,
-    'chgut_delay':  delayRange,
-    'dsgot':        tempRange,
-    'dsgot_rel':    tempRange,
-    'dsgot_delay':  delayRange,
-    'dsgut':        tempRange,
-    'dsgut_rel':    tempRange,
-    'dsgut_delay':  delayRange,
 
-    'chgoc':        chgRange,
-    'chgoc_rel':    delayRange,
-    'chgoc_delay':  delayRange,
-    'dsgoc':        dsgRange,
-    'dsgoc_rel':    delayRange,
-    'dsgoc_delay':  delayRange,
+fa = FieldAnnotation
+field_annotations = [
+    fa('covp', range=cellRange, tooltip='cell over volt protection'),
+    fa('covp_rel', range=cellRange, tooltip='cell over volt protection release'),
+    fa('covp_delay', range=delayRange, tooltip='cell over volt protection delay'),
+    fa('cuvp', range=cellRange, tooltip='cell under volt protection'),
+    fa('cuvp_rel', range=cellRange, tooltip='cell under volt protection release'),
+    fa('cuvp_delay', range=delayRange, tooltip='cell under volt protection delay'),
+    fa('povp', range=packRange, tooltip='pack over volt protection'),
+    fa('povp_rel', range=packRange, tooltip='pack over volt protection release'),
+    fa('povp_delay', range=delayRange, tooltip='pack over volt protection delay'),
+    fa('puvp', range=packRange, tooltip='pack under volt protection'),
+    fa('puvp_rel', range=packRange, tooltip='pack under volt protection release'),
+    fa('puvp_delay', range=delayRange, tooltip='pack under volt protection delay'),
+    fa('chgot', range=tempRange, tooltip='charge over temp'),
+    fa('chgot_rel', range=tempRange, tooltip='charge over temp release'),
+    fa('chgot_delay', range=delayRange, tooltip='charge over temp delay'),
+    fa('chgut', range=tempRange, tooltip='charge under temp'),
+    fa('chgut_rel', range=tempRange, tooltip='charge under temp release'),
+    fa('chgut_delay', range=delayRange, tooltip='charge under temp delay'),
+    fa('dsgot', range=tempRange, tooltip='discharge over temp'),
+    fa('dsgot_rel', range=tempRange, tooltip='discharge over temp release'),
+    fa('dsgot_delay', range=delayRange, tooltip='discharge over temp delay'),
+    fa('dsgut', range=tempRange, tooltip='discharge under temp'),
+    fa('dsgut_rel', range=tempRange, tooltip='discharge under temp release'),
+    fa('dsgut_delay', range=delayRange, tooltip='discharge under tempdelay'),
+ 
+    fa('chgoc', range=chgRange, tooltip='charge over current'),
+    fa('chgoc_rel', range=delayRange, tooltip='charge over current release'),
+    fa('chgoc_delay', range=delayRange, tooltip='charge over current delay'),
+    fa('dsgoc', range=dsgRange, tooltip='discharge over current'),
+    fa('dsgoc_rel', range=delayRange, tooltip='discharge over current release'),
+    fa('dsgoc_delay', range=delayRange, tooltip='discharge over current delay'),
 
-    'covp_high':    cellRange,
-    'cuvp_high':    cellRange,
+    fa('covp_high', range=cellRange, tooltip='cell over volt protection'),
+    fa('cuvp_high', range=cellRange, tooltip='cell under volt protection'),
 
-    'bal_start':    cellRange,
-    'bal_window':   (*cellRange[:2], 10),
+    fa('bal_start', range=cellRange, tooltip='balance start voltage: start balancing when above this threshold'),
+    fa('bal_window', range=(*cellRange[:2], 10), tooltip='balance window: enable balancing if voltage is outside this window'),
 
-    'design_cap':   mahRange,
-    'cycle_cap':    mahRange,
-    'dsg_rate':     (0.0, 100.0, .1),
-    'fet_ctrl':     (0, 65535, 1),
-    'led_timer':    (0, 65535, 1),
+    fa('design_cap', range=mahRange, tooltip='design capacity'),
+    fa('cycle_cap', range=mahRange, tooltip='cycle capacity'),
+    fa('dsg_rate', range=(0.0, 100.0, .1), tooltip='self discharge rate'),
+    fa('fet_ctrl', range=(0, 65535, 1), tooltip=''),
+    fa('led_timer', range=(0, 65535, 1), tooltip=''),
 
-    'cap_100':      cellRange,
-    'cap_80':       cellRange,
-    'cap_60':       cellRange,
-    'cap_40':       cellRange,
-    'cap_20':       cellRange,
-    'cap_0':        cellRange,
+    fa('cap_100', range=cellRange, tooltip='full cell voltage'),
+    fa('cap_80', range=cellRange, tooltip='80% cell voltage'),
+    fa('cap_60', range=cellRange, tooltip='60% cell voltage'),
+    fa('cap_40', range=cellRange, tooltip='40% cell voltage'),
+    fa('cap_20', range=cellRange, tooltip='20% cell voltage'),
+    fa('cap_0', range=cellRange, tooltip='empty cell voltage'),
 
-
-    'cycle_cnt':    (0, 65535, 1),
-    'shunt_res':    (0.0, 6553.5, .1),
-}
+    fa('cycle_cnt', range=(0, 65535, 1), tooltip='cycle count'),
+    fa('shunt_res', range=(0.0, 6553.5, .1), tooltip='shunt resistor'),
+]
+del fa
 
 LockClass = threading.Lock
 
@@ -358,12 +369,11 @@ class EnumChoice(BetterChoice):
         return self.__enum_cls.byDisplay(int(s))
 
 class SVGImage(wx.Panel):
-    def __init__(self, parent, img, name):
+    def __init__(self, parent, img, name = 'SvgImage'):
         super().__init__(parent, name = name)
-        self.reqWidth = None
-        self.reqHeight = None
         self.Bind(wx.EVT_PAINT, self.OnPaint)
         self.SetImage(img)
+        self.Bind(wx.EVT_SIZE, self.onSize)
         self.Refresh()
 
     def SetImage(self, img):
@@ -373,22 +383,15 @@ class SVGImage(wx.Panel):
             self.img = wx.svg.SVGimage.CreateFromFile(img)
         self.Refresh()
 
-    def SetReqSize(self, width, height):
-        self.reqWidth = width
-        self.reqHeight = height
+    def onSize(self, evt):
+        w,h = self.Size
+        if any([i < 2 for i in (w,h)]):
+            w = h = max(w,h)
+            self.SetMinSize((w,h))
 
     def OnPaint(self, event):
-        w,h = self.Size
-        if self.reqWidth is not None:
-            w = self.reqWidth
-        if self.reqHeight is not None:
-            h = self.reqHeight
-        self.SetSize(w,h)
-        
-
         dc = wx.PaintDC(self)
         dc.SetBackground(wx.Brush(wx.GREEN, wx.TRANSPARENT))
-        #dc.SetBackground(wx.Brush(wx.GREEN))
         dc.Clear()
         hscale = self.Size.width / self.img.width
         vscale = self.Size.height / self.img.height
@@ -655,12 +658,15 @@ class LayoutGen:
     ####
 
     def settingsTabLayout(self, tab):
-        boxSizer  = wx.BoxSizer(wx.HORIZONTAL)
-        tab.SetSizer(boxSizer)
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        tab.SetSizer(vbox)
+
+        hbox  = wx.BoxSizer(wx.HORIZONTAL)
+        vbox.Add(hbox)
         col1Sizer = wx.BoxSizer(wx.VERTICAL)
         col2Sizer = wx.FlexGridSizer(1)
         col3Sizer = wx.FlexGridSizer(1)
-        boxSizer.AddMany([col1Sizer, col2Sizer, col3Sizer])
+        hbox.AddMany([col1Sizer, col2Sizer, col3Sizer])
 
         self.basicConfigLayout(tab, col1Sizer, colGap, boxGap)
         self.highProtectConfigLayout(tab, col1Sizer, colGap, boxGap)
@@ -668,9 +674,12 @@ class LayoutGen:
         self.ntcConfigLayout(tab, col2Sizer, colGap, boxGap)
         self.balanceConfigLayout(tab, col2Sizer, colGap, boxGap)
         self.otherConfigLayout(tab, col2Sizer, colGap, boxGap)
-        self.controlConfigLayout(tab, col2Sizer, colGap, boxGap)
         self.capacityConfigLayout(tab, col3Sizer, colGap, boxGap)
         self.faultCountsLayout(tab, col3Sizer, colGap, boxGap)
+
+        hbox  = wx.BoxSizer(wx.HORIZONTAL)
+        vbox.Add(hbox, 1, wx.EXPAND)
+        self.controlConfigLayout(tab, hbox, colGap, boxGap)
 
         tab.Layout()
         tab.Fit()
@@ -892,12 +901,12 @@ class LayoutGen:
             (wx.StaticText(sb, label = 'mΩ'), 0, a),
         ])
         s2.AddMany([ 
-                (BetterChoice(sb, choices = [str(i) for i in range(1,17)], name='cell_cnt'), 0, a),
+                (BetterChoice(sb, choices = [str(i) for i in range(1,33)], name='cell_cnt'), 0, a),
         ])
         fgs.AddMany([
-            (wx.StaticText(sb, label = 'Shunt res'), 0, a), (s1,), 
+            (wx.StaticText(sb, label = 'Shunt res'), 0, a | wx.ALIGN_RIGHT), (s1,), 
             (0,0),
-            (wx.StaticText(sb, label = 'Cell cnt'), 0, a), (s2,)
+            (wx.StaticText(sb, label = 'Cell cnt'), 0, a | wx.ALIGN_RIGHT), (s2,)
             ])
 
         s1 = wx.BoxSizer()
@@ -958,26 +967,58 @@ class LayoutGen:
         panel = wx.Panel(parent)
         sb = wx.StaticBox(panel, label='Control')
         sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
-        fgs = wx.FlexGridSizer(3, gap=boxGap)
-        fgs.AddGrowableCol(1)
+        bs = wx.BoxSizer()
         a = wx.ALIGN_CENTER_VERTICAL
-        sbs.Add(fgs, 0, *defaultBorder)
+        #sbs.Add(bs, 1, *defaultBorder)
+        sbs.Add(bs, 1, wx.EXPAND)
         panel.SetSizer(sbs)
         sizer.Add(panel, 1, *defaultBorder)
 
-        read_btn = wx.Button(sb, label='Read EEPROM', name='read_eeprom_btn')
-        write_btn = wx.Button(sb, label='Write EEPROM', name='write_eeprom_btn')
-        load_btn = wx.Button(sb, label='Load EEPROM', name='load_eeprom_btn')
-        save_btn = wx.Button(sb, label='Save EEPROM', name='save_eeprom_btn')
+        read_btn = wx.Button(sb, label='Read settings From BMS', name='read_eeprom_btn')
+        write_btn = wx.Button(sb, label='Write settings to BMS', name='write_eeprom_btn')
+        load_btn = wx.Button(sb, label='Load settings from file', name='load_eeprom_btn')
+        save_btn = wx.Button(sb, label='Save settings to file', name='save_eeprom_btn')
         write_btn.Enable(False)
         save_btn.Enable(False)
 
-        fgs.Add(read_btn, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
-        fgs.Add(0,0)
-        fgs.Add(write_btn, 0, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
-        fgs.Add(load_btn, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
-        fgs.Add(0,0)
-        fgs.Add(save_btn, 1, wx.EXPAND | wx.ALIGN_CENTER_VERTICAL)
+
+
+        #batt_svg.SetMinSize((20,20))
+        box = wx.FlexGridSizer(11)
+        #bs.Add(box, 1, wx.EXPAND)
+        bs.Add(box)
+
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'battery_icon_h.svg')), 1 , wx.EXPAND)
+        box.Add(5,1)
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'arrow_right.svg')), 1, wx.EXPAND)
+        box.Add(5,1)
+        box.Add(read_btn, 1, wx.EXPAND)
+
+        box.Add(15,1)
+
+        box.Add(write_btn, 1, wx.EXPAND)
+        box.Add(5,1)
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'arrow_right.svg')), 1, wx.EXPAND)
+        box.Add(5,1)
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'battery_icon_h.svg')), 1 , wx.EXPAND)
+
+        bs.AddStretchSpacer()
+
+        box = wx.FlexGridSizer(11)
+        bs.Add(box)
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'floppy.svg')), 1, wx.EXPAND)
+        box.Add(5,1)
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'arrow_right.svg')), 1, wx.EXPAND)
+        box.Add(5,1)
+        box.Add(load_btn, 1, wx.EXPAND)
+
+        box.Add(15,1)
+
+        box.Add(save_btn, 1, wx.EXPAND)
+        box.Add(5,1)
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'arrow_right.svg')), 1, wx.EXPAND)
+        box.Add(5,1)
+        box.Add(SVGImage(sb, os.path.join(base_path, 'img', 'floppy.svg')), 1, wx.EXPAND)
 
     def capacityConfigLayout(self, parent, sizer, colGap, boxGap):
         panel = wx.Panel(parent)
@@ -1273,6 +1314,7 @@ class ChildIter:
         'staticText', 
         'panel', 
         'GridWindow', 
+        'SvgImage', 
         'text', 
         'wxSpinButton',
         'groupBox', 
@@ -1388,19 +1430,27 @@ class Main(wx.Frame):
 
         for c in ChildIter.iterNamed(self.calTab):
             c.Name = 'cal_' + c.Name
+        
+        # apply field annotations
 
-        for name, r in ranges.items():
-            name = 'eeprom_'+name
-            w = self.FindWindowByName(name)
+        children_by_name = {c.Name:c for c in ChildIter.iterNamed(self)}
+        children_by_label = {c.GetLabel() for c in children_by_name.values()}
+        for fa in field_annotations:
+            fieldName = 'eeprom_'+fa.fieldName
+            w = self.FindWindowByName(fieldName)
             if not w:
-                print(f'unknown control {name}')
+                print(f'unknown control {fieldName}')
                 continue
-            try:
-                min, max, increment = r
-                w.SetRange(min, max)
-                w.SetIncrement(increment)
-            except Exception as e:
-                print(f'unable to call SetRange on {name}')
+            if fa.tooltip:
+                w.SetToolTip(fa.tooltip)
+
+            if fa.range:
+                try:
+                    min, max, increment = fa.range
+                    w.SetRange(min, max)
+                    w.SetIncrement(increment)
+                except Exception as e:
+                    print(f'unable to call SetRange on {fieldName}')
 
         nb_sizer = wx.BoxSizer()
         nb_sizer.Add(nb, 1, wx.EXPAND | wx.ALL, 5)
@@ -1635,12 +1685,13 @@ class Main(wx.Frame):
         if w is None:
             print(f'set: unknown field: {name}')
             return
-        if (isinstance(w, wx.TextCtrl) or 
-            isinstance(w, RoundGauge) or 
-            isinstance(w, wx.SpinCtrlDouble)):
+        if isinstance(w, wx.TextCtrl):
             w.SetValue(svalue)
         elif isinstance(w, wx.StaticText):
             w.SetLabel(svalue)
+        elif (isinstance(w, wx.SpinCtrlDouble) or
+              isinstance(w, RoundGauge)):
+            w.SetValue(float(value))
         elif (isinstance(w, BoolImage) or 
               isinstance(w, wx.CheckBox) or 
               isinstance(w, BetterChoice)):

@@ -187,8 +187,11 @@ class ErrorCountReg(ReadOnlyMixin, BaseReg):
         return self._values[valueName]
     
     def unpack(self, payload):
-        values = struct.unpack('>11H', payload)
-        self._values = dict(zip(self._values.keys(), values))
+        valueCount = len(self._values)
+        bmsValueCount = len(payload) // 2
+        values = struct.unpack(f'>{bmsValueCount}H', payload)
+
+        self._values = dict(zip(self._values.keys(), values[:valueCount]))
 
 class DelayReg(BaseReg):
     'class that deals with registers that store two time values, in seconds'
