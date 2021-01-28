@@ -231,6 +231,52 @@ class WriteRedirect:
 
     def flush(self): pass
 
+
+class FwDebugDialog(wx.Dialog):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.SetTitle(f'Debug Controls')
+        self.doLayout()
+        self.inControl = False
+
+    def doLayout(self):
+        topsizer = wx.BoxSizer()
+        sb = wx.StaticBox(self, label='Basic Configuration')
+        sbs = wx.StaticBoxSizer(sb, wx.VERTICAL)
+
+        vbox0 = wx.BoxSizer(wx.VERTICAL)
+        hbox = wx.BoxSizer()
+        vbox1 = wx.FlexGridSizer(2)
+        vbox2 = wx.FlexGridSizer(2)
+        hbox.Add(vbox1)
+        hbox.Add(vbox2)
+
+        vbox0.Add(hbox)
+        sbs.Add(vbox0, 1, *defaultBorder)
+
+        def gen(fn, n):
+
+            t = wx.StaticText(self, label=f'Cell {n}')
+            c1 = wx.SpinCtrlDouble(self, name = fn)
+            return [ 
+                (t, 0, rflags),
+                (c1,0, lflags)
+                 ]
+
+        for i in range(15):
+            vbox1.AddMany(gen(f'dbg_cell_mv_i', i))
+
+        
+        controlButton = wx.Button(self, label='Take Control')
+        controlButton.Bind(wx.EVT_BUTTON, self.onControlButton)
+        vbox0.Add(controlButton, 1, *defaultBorder)
+
+        topsizer.Add(sbs, 1, *defaultBorder)
+        self.SetSizerAndFit(topsizer)
+
+    def onControlButton(self, evt):
+        print('TAKE CONTROL!')
+
 class AboutDialog(wx.Dialog):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1395,6 +1441,7 @@ class Main(wx.Frame):
         self.fileMenu = wx.Menu()
         self.debugWindowItem = self.fileMenu.Append(wx.ID_ANY, 'Debug Window', 'Show debug window', kind = wx.ITEM_CHECK)
         self.aboutItem = self.fileMenu.Append(wx.ID_ABOUT, 'About', f'About {appName}')
+        self.debugItem = self.fileMenu.Append(wx.ID_ANY, 'FW Debug', f'FW Debug')
         self.websiteItem = self.fileMenu.Append(wx.ID_ANY, f'{appName} website', f'{appName} website')
         self.quitItem = self.fileMenu.Append(wx.ID_ANY, 'Quit')
         self.menuBar.Append(self.fileMenu, '&File')
@@ -1402,6 +1449,7 @@ class Main(wx.Frame):
         self.Bind(wx.EVT_MENU, self.onDebugWindowToggle, self.debugWindowItem)
         self.Bind(wx.EVT_MENU, self.onWebsite, self.websiteItem)
         self.Bind(wx.EVT_MENU, self.onAbout, self.aboutItem)
+        self.Bind(wx.EVT_MENU, self.onFwDebug, self.debugItem)
         self.Bind(wx.EVT_MENU, self.onQuit, self.quitItem)
 
         layout = LayoutGen(self)
@@ -1529,6 +1577,11 @@ class Main(wx.Frame):
         a = AboutDialog(self)
         a.SetIcon(self.icon)
         a.ShowModal()
+
+    def onFwDebug(self, evt):
+        d = FwDebugDialog(self)
+        d.Show();
+
 
     def onWebsite(self, evt):
         wx.BeginBusyCursor()
