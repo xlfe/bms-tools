@@ -122,7 +122,7 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
     </tr>
     <tr>
      <td>0xA</td>
-     <td>Manfuacture date</td>
+     <td>Manufacture date</td>
      <td>
         16 bit:<br>
         bits 15:9=year - 2000<br>
@@ -248,7 +248,6 @@ The number of values returned depends on the cell_cnt field from 0x3 "Basic Info
 </table>
 
 #### Register 0x05 "Device Name" (READ ONLY)
-The number of values returned depends on the cell_cnt field from 0x3 "Basic Info".
 <table border="1">
     <tr>
      <th>Byte offset</th>
@@ -283,7 +282,7 @@ Write the byte sequence 0x56, 0x78 to enter "Factory Mode."  In this mode, the o
 #### Register 0x01 "Exit factory Mode"
 Write the byte sequence 0x0, 0x0 to exit "Factory Mode."
 
-Write the byte sequence 0x28, 0x28 to exit "Factory Mode," update the values in the EEROM, and reset the "Error Counts" (0xAA) register to zeroes.
+Write the byte sequence 0x28, 0x28 to exit "Factory Mode," update the values in the EEPROM, and reset the "Error Counts" (0xAA) register to zeroes.
 
 #### Stored registers:
 <table border="1">
