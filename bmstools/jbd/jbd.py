@@ -20,6 +20,7 @@ import serial
 import time
 import struct
 import threading
+import queue
 import sys
 from enum import Enum
 from functools import partial
@@ -68,6 +69,8 @@ class JBD:
         self.timeout = timeout
         self.debug = debug
         self.writeNVMOnExit = False
+        self.bkgReadThread = None
+        self.bkgReadQ = queue.Queue()
 
         self.eeprom_regs = [
             ### EEPROM settings
@@ -168,12 +171,14 @@ class JBD:
         self.s = s 
 
     def open(self):
+        if self.bkgReadThread: return
         self._open_cnt += 1
         if self._open_cnt == 1:
             self._lock.acquire()
             self.s.open()
     
     def close(self):
+        if self.bkgReadThread: return
         if not self._open_cnt: 
             return
         self._open_cnt -= 1
@@ -193,7 +198,6 @@ class JBD:
         return data
 
     def cmd(self, op, reg, data):
-
         payload = [reg, len(data)] + list(data)
         chksum = self.chksum(payload)
         data = [self.START, op] + payload + [chksum, self.END]
@@ -206,9 +210,10 @@ class JBD:
     def writeCmd(self, reg, data = []):
         return self.cmd(self.WRITE, reg, data)
 
-    def readPacket(self):
-        then = time.time() + self.timeout
-        self.dbgPrint(f'timeout is {self.timeout}')
+    def _readPacket(self, timeout = None):
+        t = timeout if timeout is not None else self.timeout
+        then = time.time() + t
+        self.dbgPrint(f'timeout is {t}')
         d = []
         msgLen = 0
         complete = False
@@ -225,10 +230,85 @@ class JBD:
                 break
         if d and complete:
             self.dbgPrint('readPacket:', self.toHex(d))
+            reg = d[1]
             ok = not d[2]
-            return ok, self.extractPayload(bytes(d))
+            return ok, reg, self.extractPayload(bytes(d))
         self.dbgPrint(f'readPacket failed with {len(d)} bytes')
-        return False, None
+        return False, None, None
+
+    def bkgReadWorker(self):
+        self.dbgPrint('bkgReadWorker started')
+        try:
+            self.s.open()
+            while self.bkgReadRun:
+                ok, reg, payload = self._readPacket()
+                if ok:
+                    if reg == 0xFE:
+                        try:
+                            payload = str(payload, 'utf-8')
+                            print('dbg >', payload)
+                        except:
+                            print(' '.join([f'{i:02X}' for i in payload]))
+                    else:
+                        self.bkgReadQ.put((ok, payload))
+        finally:
+            self.s.close()
+        self.dbgPrint('bkgReadWorker terminated')
+
+    #primarily for firmware debugging; not used by normal GUI
+    @property
+    def bkgRead(self):
+        return bool(self.bkgReadThread)
+
+    @bkgRead.setter
+    def bkgRead(self, enable):
+        if enable:
+            if not self.bkgReadThread:
+                self.bkgReadRun = True
+                self.bkgReadThread = threading.Thread(target = self.bkgReadWorker)
+                self.bkgReadThread.start()
+        else:
+            if self.bkgReadThread:
+                self.bkgReadRun = False
+                self.bkgReadThread.join(5)
+                if self.bkgReadThread.is_alive():
+                    self.dbgPrint('bkgReadThread did not join')
+                else:
+                    self.dbgPrint('bkgReadThread successfully joined')
+                self.bkgReadThread = None
+
+    def readPacket(self):
+        if self.bkgReadThread: # mostly FW debugging
+            try:
+                ok, payload = self.bkgReadQ.get(timeout = self.timeout)
+                return ok, payload
+            except queue.Empty:
+                return False, None
+        else: # normal path
+            ok, _, payload = self._readPacket()
+            return ok, payload
+
+    def writeCmdWaitResp(self, adx, payload):
+        return self._sendCmdWaitResp(adx, payload, False)
+
+    def readCmdWaitResp(self, adx, payload):
+        return self._sendCmdWaitResp(adx, payload, True)
+
+    def _sendCmdWaitResp(self, adx, payload, read):
+        if read:
+            cmd = self.readCmd(adx, payload)
+        else:
+            cmd = self.writeCmd(adx, payload)
+
+        try:
+            self.open()
+            self.s.write(cmd)
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
+            if payload is None: raise TimeoutError()
+            return payload
+        finally:
+            self.close()
 
     def __enter__(self):
         self.open()
