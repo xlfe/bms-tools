@@ -1,0 +1,1 @@
+../../../../bms-firmware-jbd/python/debug_struct.py
