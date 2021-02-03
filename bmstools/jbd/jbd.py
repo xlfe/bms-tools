@@ -66,6 +66,7 @@ class JBD:
             pass
         self._open_cnt = 0
         self._lock = threading.RLock()
+        self._dbgTime = 0
         self.timeout = timeout
         self.debug = debug
         self.writeNVMOnExit = False
@@ -159,7 +160,12 @@ class JBD:
     def dbgPrint(self, *args, **kwargs):
         kwargs['file'] = sys.stderr
         if self.debug:
+            args = list(args)
+            now = time.time()
+            elapsed = now - self._dbgTime if self._dbgTime else 0
+            args.insert(0, f'[{elapsed:.3f}]')
             print(*args, **kwargs)
+            self._dbgTime = now
 
     @property
     def serial(self):
@@ -221,6 +227,8 @@ class JBD:
             byte = self.s.read()
             if not byte: 
                 continue
+            then = time.time() + t
+            self.dbgPrint(f'raw rx byte: {byte}')
             byte = byte[0]
             d.append(byte)
             if len(d) == 4:
