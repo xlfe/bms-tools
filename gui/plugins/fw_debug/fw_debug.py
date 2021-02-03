@@ -92,7 +92,7 @@ class FwDebugDialog(PluginBase, wx.Dialog):
         def gen_ntc_ctrl(i):
 
             t = wx.StaticText(self, label=f'NTC {i}')
-            c = wx.SpinCtrlDouble(self, name=f'ntc_k_{i}', min = 0,max = 6553.5, inc=0.1)
+            c = wx.SpinCtrlDouble(self, name=f'ntc_k_{i}', min = -273.15,max = 6553.5, inc=0.1)
             b = wx.Button(self, label='Set')
             f = functools.partial(self.setNtcC, i, c)
             b.Bind(wx.EVT_BUTTON, f)
@@ -116,6 +116,16 @@ class FwDebugDialog(PluginBase, wx.Dialog):
             (c, 1, lflags),
             (b, 1, lflags, 5)
         ))
+        t = wx.StaticText(self, label=f'Pack mV')
+        c = wx.SpinCtrlDouble(self, name=f'pack_mv', min = 0,max = 655360, inc=10)
+        b = wx.Button(self, label='Set')
+        f = functools.partial(self.onSetPackCv, c)
+        b.Bind(wx.EVT_BUTTON, f)
+        vbox1.AddMany((
+            (t, 1, rflags, 5),
+            (c, 1, lflags),
+            (b, 1, lflags, 5)
+        ))
 
         syncButton = wx.Button(self, label = 'Sync From App')
         syncButton.Bind(wx.EVT_BUTTON, self.syncFromApp)
@@ -131,6 +141,9 @@ class FwDebugDialog(PluginBase, wx.Dialog):
         vbox0.Add(self.controlButton, 1, *defaultBorder)
 
         topsizer.Add(sbs, 1, *defaultBorder)
+
+        self.Bind(wx.EVT_WINDOW_DESTROY, self.onDestroy)
+
         self.SetSizerAndFit(topsizer)
 
     def toggleDebugPrint(self, _ = None, force = None):
@@ -143,9 +156,13 @@ class FwDebugDialog(PluginBase, wx.Dialog):
             self.bkgDebugButton.SetLabel('Disable dbg print')
         else:
             self.bkgDebugButton.SetLabel('Enable dbg print')
+
+    
+    def onDestroy(self, _):
+        self.j.bkgRead = False
+        print("I was destroyed")
     
     def syncFromApp(self, _):
-
         if self.cellInfo:
             # cell mv
             for i, v in enumerate(self.cellInfo.values()):
@@ -168,9 +185,13 @@ class FwDebugDialog(PluginBase, wx.Dialog):
             if control:
                 control.SetValue(str(self.basicInfo['pack_ma']))
 
+            control = wx.FindWindowByName('pack_mv')
+            if control:
+                control.SetValue(str(self.basicInfo['pack_mv']))
+
     def onSetCellMv(self, cell_num, widget, evt):
         cell_mv = int(widget.GetValue())
-        print('set', cell_num, 'mv', cell_mv)
+        print('set cell', cell_num, 'mV', cell_mv)
         try:
             self.GetParent().accessLock.acquire()
             s = debug_struct.debug_cmd_packet_t()
@@ -206,6 +227,20 @@ class FwDebugDialog(PluginBase, wx.Dialog):
             s = debug_struct.debug_cmd_packet_t()
             s.cmd = debug_struct.DEBUG_CMD_SET_PACK_CA;
             s.u.pack_ca.pack_ca = int(pack_ma / 10)
+            payload = self.j.writeCmdWaitResp(0xFF, bytes(s))
+        except:
+            traceback.print_exc()
+        finally:
+            self.GetParent().accessLock.release()
+
+    def onSetPackCv(self, widget, evt):
+        pack_mv = float(widget.GetValue())
+        print('set pack', pack_mv, 'mV')
+        try:
+            self.GetParent().accessLock.acquire()
+            s = debug_struct.debug_cmd_packet_t()
+            s.cmd = debug_struct.DEBUG_CMD_SET_PACK_CV;
+            s.u.pack_cv.pack_cv = int(pack_mv / 10)
             payload = self.j.writeCmdWaitResp(0xFF, bytes(s))
         except:
             traceback.print_exc()
