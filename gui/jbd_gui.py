@@ -2168,7 +2168,6 @@ class BkgWorker:
 
                         basicInfo, cellInfo, deviceInfo = self.j.readInfo()
                         wx.PostEvent(self.parent, self.ScanData(basicInfo = basicInfo, cellInfo = cellInfo, deviceInfo = deviceInfo))
-                        print('scan complete')
                     except Exception as e:
                         wx.PostEvent(self.parent, self.ScanData(err = e))
                     finally:
