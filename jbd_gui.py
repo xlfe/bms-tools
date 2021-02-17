@@ -112,8 +112,47 @@ field_annotations = [
     fa('dsgoc_rel', range=delayRange, tooltip='discharge over current release'),
     fa('dsgoc_delay', range=delayRange, tooltip='discharge over current delay'),
 
-    fa('covp_high', range=cellRange, tooltip='cell over volt protection'),
-    fa('cuvp_high', range=cellRange, tooltip='cell under volt protection'),
+    fa('covp_high', range=cellRange, tooltip='cell over volt protection (level 2)'),
+    fa('covp_high_delay', range=cellRange, tooltip='cell over volt protection (level 2) delay'),
+    fa('cuvp_high', range=cellRange, tooltip='cell under volt protection (level 2)'),
+    fa('cuvp_high_delay', range=cellRange, tooltip='cell under volt protection (level 2) delay'),
+
+
+    fa('sc_dsgoc_x2', tooltip='double all short circuit and discharge overcurrent values'),
+
+    fa('sc_rel', tooltip='short circuit release'),
+
+    fa('dsgoc2', tooltip='discharge overcurrent protection (level 2) shunt voltage'),
+    fa('dsgoc2_delay', tooltip='discharge overcurrent protection (level 2) delay'),
+
+    fa('sc', tooltip='short circuit shunt voltage'),
+    fa('sc_delay', tooltip='short circuit delay'),
+
+    fa('chgoc_err_cnt', tooltip = 'charge overcurrent error count'),
+    fa('dsgoc_err_cnt', tooltip = 'discharge overcurrent error count'),
+    fa('chgot_err_cnt', tooltip = 'charge overtemp error count'),
+    fa('chgut_err_cnt', tooltip = 'charge undertemp error count'),
+    fa('dsgot_err_cnt', tooltip = 'discharge overtemp error count'),
+    fa('dsgut_err_cnt', tooltip = 'discharge undertemp error count'),
+    fa('povp_err_cnt', tooltip = 'pack overvoltage error count'),
+    fa('puvp_err_cnt', tooltip = 'pack undervoltage error count'),
+    fa('covp_err_cnt', tooltip = 'cell overvoltage error count'),
+    fa('cuvp_err_cnt', tooltip = 'cell undervoltage error count'),
+    fa('sc_err_cnt', tooltip = 'short circuit error count'),
+
+    fa('covp_err', tooltip = 'cell overvoltage error'),
+    fa('cuvp_err', tooltip = 'cell undervoltage error'),
+    fa('povp_err', tooltip = 'pack overvoltage error'),
+    fa('puvp_err', tooltip = 'pack undervoltage error'),
+    fa('chgoc_err', tooltip = 'charge overcurrent error'),
+    fa('dsgoc_err', tooltip = 'discharge overcurrent error'),
+    fa('chgot_err', tooltip = 'charge overtemp error'),
+    fa('chgut_err', tooltip = 'charge undertemp error'),
+    fa('dsgot_err', tooltip = 'discharge overtemp error'),
+    fa('dsgut_err', tooltip = 'discharge undertemp error'),
+    fa('sc_err', tooltip = 'short circuit error'),
+    fa('afe_err', tooltip = 'analog front end error'),
+    fa('software_err', tooltip = 'software error; FET(s) are disabled in calibration & misc tab'),
 
     fa('bal_start', range=cellRange, tooltip='balance start voltage: start balancing when above this threshold'),
     fa('bal_window', range=(*cellRange[:2], 10), tooltip='balance window: enable balancing if voltage is outside this window'),
@@ -624,7 +663,7 @@ class LayoutGen:
                 bi = BoolImage(sb, img1, img2, fn)
                 bi.SetMinSize(self.size)
                 bi.SetValue(False)
-                txt = wx.StaticText(sb, label = label + ':')
+                txt = wx.StaticText(sb, label = label + ':', name = f'label_{fn}')
                 gbs.Add(txt, (self.row, self.col), flag = rflags)
                 self.col += 1
                 gbs.Add(bi, (self.row, self.col), flag = rflags)
@@ -696,23 +735,26 @@ class LayoutGen:
 
         def gen(fn, unit1, unit2 = None, unit3 = 'S', spacing=10, digits = 0):
             unit2 = unit2 or unit1
-            #c1 = wx.SpinCtrlDouble(sb, name = fn,  size = self.txtSize10)
-            #c2 = wx.SpinCtrlDouble(sb, name = fn + '_rel', size=self.txtSize10)
+            fn_rel = fn + '_rel'
+            fn_delay = fn + '_delay'
+
             c1 = wx.SpinCtrlDouble(sb, name = fn)
-            c2 = wx.SpinCtrlDouble(sb, name = fn + '_rel')
+            c2 = wx.SpinCtrlDouble(sb, name = fn_rel)
+            c3 = wx.SpinCtrlDouble(sb, name = fn_delay)
             c1.SetDigits(digits)
             c2.SetDigits(digits)
+
             items = [
-                (wx.StaticText(sb, label = fn.upper()), 0, rflags),
+                (wx.StaticText(sb, label = fn.upper(), name = f'label_{fn}'), 0, rflags),
                 (c1, 0, lflags),
                 (wx.StaticText(sb, label = unit1), 0, lflags),
                 colGap,
-                (wx.StaticText(sb, label = 'Rel'), 0, rflags),
+                (wx.StaticText(sb, label = 'Rel', name = f'label_{fn_rel}'), 0, rflags),
                 (c2, 0, lflags),
                 (wx.StaticText(sb, label = unit2), 0, lflags),
                 colGap,
-                (wx.StaticText(sb, label = 'Delay'), 0, rflags),
-                (wx.SpinCtrlDouble(sb, name = fn + '_delay'), 0, lflags),
+                (wx.StaticText(sb, label = 'Delay', name = f'label_{fn_delay}'), 0, rflags),
+                (c3, 0, lflags),
                 (wx.StaticText(sb, label = unit3), 0, lflags),
             ]
             return items
@@ -757,9 +799,9 @@ class LayoutGen:
         
 
         fgs.AddMany([
-            (wx.StaticText(sb, label = 'DSGOC2'), 0, a), (s1,), 
+            (wx.StaticText(sb, label = 'DSGOC2', name = 'label_dsgoc2'), 0, a), (s1,), 
             (0,0),
-            (wx.StaticText(sb, label = 'Delay'), 0, a), (s2,)
+            (wx.StaticText(sb, label = 'Delay', name = 'label_dsgoc2_delay'), 0, a), (s2,)
             ])
 
         # SC value / delay
@@ -775,9 +817,9 @@ class LayoutGen:
         ])
 
         fgs.AddMany([
-            (wx.StaticText(sb, label = 'SC Value'), 0, a), (s1,), 
+            (wx.StaticText(sb, label = 'SC Value', name = 'label_sc'), 0, a), (s1,), 
             (0,0),
-            (wx.StaticText(sb, label = 'Delay'), 0, a), (s2,)
+            (wx.StaticText(sb, label = 'Delay', name = 'label_sc_delay'), 0, a), (s2,)
             ])
 
         # COVP High
@@ -793,9 +835,9 @@ class LayoutGen:
         ])
 
         fgs.AddMany([
-            (wx.StaticText(sb, label = 'COVP High'), 0, a), (s1,), 
+            (wx.StaticText(sb, label = 'COVP High', name = 'label_covp_high'), 0, a), (s1,), 
             (0,0),
-            (wx.StaticText(sb, label = 'Delay'), 0, a), (s2,)
+            (wx.StaticText(sb, label = 'Delay', name = 'label_covp_high_delay'), 0, a), (s2,)
             ])
 
         # CUVP High
@@ -810,9 +852,9 @@ class LayoutGen:
                 (wx.StaticText(sb, label = 'S'), 0, a),
         ])
         fgs.AddMany([
-            (wx.StaticText(sb, label = 'CUVP High'), 0, a), (s1,), 
+            (wx.StaticText(sb, label = 'CUVP High', name = 'label_cuvp_high'), 0, a), (s1,), 
             (0,0),
-            (wx.StaticText(sb, label = 'Delay'), 0, a), (s2,)
+            (wx.StaticText(sb, label = 'Delay', name = 'label_cuvp_high_delay'), 0, a), (s2,)
             ])
 
         # SC Release
@@ -822,7 +864,7 @@ class LayoutGen:
                 (wx.StaticText(sb, label = 'S'), 0, lflags),
         ])
         fgs.AddMany([
-            (wx.StaticText(sb, label = 'SC Rel'), 0, a), (s1,), 
+            (wx.StaticText(sb, label = 'SC Rel', name = f'label_sc_rel'), 0, a), (s1,), 
             ])
 
     def functionConfigLayout(self, parent, sizer, colGap, boxGap):
@@ -1067,12 +1109,12 @@ class LayoutGen:
 
         def gen(label1, field1, label2 = None, field2 = None):
             items = [
-                (wx.StaticText(sb, label = label1+':'), 0, rflags),
+                (wx.StaticText(sb, label = label1+':', name = f'label_{field1}'), 0, rflags),
                 (wx.StaticText(sb, name = field1, label='----'), 0, lflags)
             ]
             if field2:
                 items += [
-                (wx.StaticText(sb, label = label2+':'), 0, rflags),
+                (wx.StaticText(sb, label = label2+':', name = f'label_{field2}'), 0, rflags),
                 (wx.StaticText(sb, name = field2, label='----'), 0, lflags),
             ]
             return items
@@ -1436,21 +1478,22 @@ class Main(wx.Frame):
         children_by_name = {c.Name:c for c in ChildIter.iterNamed(self)}
         children_by_label = {c.GetLabel() for c in children_by_name.values()}
         for fa in field_annotations:
-            fieldName = 'eeprom_'+fa.fieldName
-            w = self.FindWindowByName(fieldName)
-            if not w:
-                print(f'unknown control {fieldName}')
-                continue
-            if fa.tooltip:
-                w.SetToolTip(fa.tooltip)
+            for prefix in ('eeprom_', 'eeprom_label_', 'info_', 'info_label_'):
+                fieldName = prefix+fa.fieldName
+                field = self.FindWindowByName(fieldName)
+                if not field: 
+                    continue
 
-            if fa.range:
-                try:
-                    min, max, increment = fa.range
-                    w.SetRange(min, max)
-                    w.SetIncrement(increment)
-                except Exception as e:
-                    print(f'unable to call SetRange on {fieldName}')
+                if fa.tooltip:
+                    field.SetToolTip(fa.tooltip)
+
+                if fa.range:
+                    try:
+                        min, max, increment = fa.range
+                        field.SetRange(min, max)
+                        field.SetIncrement(increment)
+                    except Exception as e:
+                        print(f'unable to call SetRange on {fieldName}')
 
         nb_sizer = wx.BoxSizer()
         nb_sizer.Add(nb, 1, wx.EXPAND | wx.ALL, 5)
