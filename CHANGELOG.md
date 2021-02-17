@@ -2,6 +2,14 @@
 
 ## Changelog
 
+### v1.1.2 2021-2-16
+
+* Feature: Tool tips
+* Feature: Load/Save/Read/Write made more clear
+* Fix: Minor updates and fixes in JBD_REGISTER_MAP.MD
+* Fix: EEPROM save not sticking between power cycles
+* Fix: 16S BMS error 
+
 ### v1.1.1 2020-12-31
 
 * Fix for temp field decimal indicator problems based on locale
