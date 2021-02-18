@@ -1234,11 +1234,17 @@ class LayoutGen:
         hbs = wx.BoxSizer(wx.HORIZONTAL)
         gbs.Add(wx.StaticText(sb, label = 'FET Control:'), wx.GBPosition(row,0), flag = rflags)
         gbs.Add(hbs, wx.GBPosition(row,1))
-        hbs.Add(wx.CheckBox(sb, label='Charge Enable', name='chg_enable'), 0, lflags)
+        cb = wx.CheckBox(sb, label='Charge Enable', name='chg_enable')
+        cb.SetValue(True)
+        hbs.Add(cb, 0, lflags)
         hbs.AddSpacer(10)
-        hbs.Add(wx.CheckBox(sb, label='Discharge Enable', name='dsg_enable'), 0, lflags)
+        cb = wx.CheckBox(sb, label='Discharge Enable', name='dsg_enable')
+        cb.SetValue(True)
+        hbs.Add(cb, 0, lflags)
         hbs.AddSpacer(20)
         hbs.Add(wx.Button(sb, label='Set', name='chg_dsg_enable_btn'))
+        hbs.AddSpacer(20)
+        hbs.Add(wx.StaticText(sb, label = 'Note: The state of the FET Control cannot be queried; these checkboxes do not represent the state.'), 0, lflags)
 
         row += 1
         row += 1
