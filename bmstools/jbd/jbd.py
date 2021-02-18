@@ -20,6 +20,7 @@ import serial
 import time
 import struct
 import threading
+import queue
 import sys
 from enum import Enum
 from functools import partial
@@ -65,9 +66,12 @@ class JBD:
             pass
         self._open_cnt = 0
         self._lock = threading.RLock()
+        self._dbgTime = 0
         self.timeout = timeout
         self.debug = debug
         self.writeNVMOnExit = False
+        self.bkgReadThread = None
+        self.bkgReadQ = queue.Queue()
 
         self.eeprom_regs = [
             ### EEPROM settings
@@ -156,7 +160,12 @@ class JBD:
     def dbgPrint(self, *args, **kwargs):
         kwargs['file'] = sys.stderr
         if self.debug:
+            args = list(args)
+            now = time.time()
+            elapsed = now - self._dbgTime if self._dbgTime else 0
+            args.insert(0, f'[{elapsed:.3f}]')
             print(*args, **kwargs)
+            self._dbgTime = now
 
     @property
     def serial(self):
@@ -168,18 +177,21 @@ class JBD:
         self.s = s 
 
     def open(self):
+        if self.bkgReadThread: return
+        self._lock.acquire()
         self._open_cnt += 1
         if self._open_cnt == 1:
-            self._lock.acquire()
             self.s.open()
     
     def close(self):
+        if self.bkgReadThread:
+            return
         if not self._open_cnt: 
             return
         self._open_cnt -= 1
+        self._lock.release()
         if not self._open_cnt:
             self.s.close()
-            self._lock.release()
 
     @staticmethod
     def chksum(payload):
@@ -193,7 +205,6 @@ class JBD:
         return data
 
     def cmd(self, op, reg, data):
-
         payload = [reg, len(data)] + list(data)
         chksum = self.chksum(payload)
         data = [self.START, op] + payload + [chksum, self.END]
@@ -206,9 +217,53 @@ class JBD:
     def writeCmd(self, reg, data = []):
         return self.cmd(self.WRITE, reg, data)
 
-    def readPacket(self):
-        then = time.time() + self.timeout
-        self.dbgPrint(f'timeout is {self.timeout}')
+
+    def bkgReadWorker(self):
+        self.dbgPrint('bkgReadWorker started')
+        while self.bkgReadRun:
+            ok, reg, payload = self._readPacket()
+            if ok:
+                # cust FW debug packet reg
+                if reg == 0xFE:
+                    try:
+                        payload = str(payload, 'utf-8')
+                        print('dbg >', payload)
+                    except:
+                        print(' '.join([f'{i:02X}' for i in payload]))
+                else:
+                    self.bkgReadQ.put((ok, payload))
+        self.dbgPrint('bkgReadWorker terminated')
+
+    #primarily for firmware debugging; not used by normal GUI
+    @property
+    def bkgRead(self):
+        return bool(self.bkgReadThread)
+
+    @bkgRead.setter
+    def bkgRead(self, enable):
+        if enable:
+            if not self.bkgReadThread:
+                while not self.bkgReadQ.empty():
+                    self.bkgReadQ.get()
+                self.bkgReadRun = True
+                self.bkgReadThread = threading.Thread(target = self.bkgReadWorker)
+                self.s.open()
+                self.bkgReadThread.start()
+        else:
+            if self.bkgReadThread:
+                self.bkgReadRun = False
+                self.bkgReadThread.join(5)
+                if self.bkgReadThread.is_alive():
+                    self.dbgPrint('bkgReadThread did not join')
+                else:
+                    self.dbgPrint('bkgReadThread successfully joined')
+                self.s.close()
+                self.bkgReadThread = None
+
+    def _readPacket(self, timeout = None):
+        t = timeout if timeout is not None else self.timeout
+        then = time.time() + t
+        self.dbgPrint(f'timeout is {t}')
         d = []
         msgLen = 0
         complete = False
@@ -216,28 +271,73 @@ class JBD:
             byte = self.s.read()
             if not byte: 
                 continue
+            self.dbgPrint(f'raw rx byte: {byte}')
             byte = byte[0]
+            if not d and byte != self.START: continue
+            then = time.time() + t
             d.append(byte)
             if len(d) == 4:
                 msgLen = d[-1]
-            if byte == 0x77 and len(d) == 7 + msgLen: 
+            if byte == self.END and len(d) >= 7 + msgLen: 
                 complete = True
                 break
         if d and complete:
             self.dbgPrint('readPacket:', self.toHex(d))
+            reg = d[1]
             ok = not d[2]
-            return ok, self.extractPayload(bytes(d))
+            return ok, reg, self.extractPayload(bytes(d))
         self.dbgPrint(f'readPacket failed with {len(d)} bytes')
-        return False, None
+        return False, None, None
+
+    def readPacket(self):
+        if self.bkgReadThread: # mostly FW debugging
+            try:
+                ok, payload = self.bkgReadQ.get(timeout = self.timeout)
+                return ok, payload
+            except queue.Empty:
+                return False, None
+        else: # normal path
+            then = time.time() + self.timeout
+            
+            while(time.time() < then):
+                ok, reg, payload = self._readPacket()
+                # cust FW debug packet reg
+                if reg != 0xFE:
+                    break
+            return ok, payload
+
+    def writeCmdWaitResp(self, adx, payload):
+        return self._sendCmdWaitResp(adx, payload, False)
+
+    def readCmdWaitResp(self, adx, payload):
+        return self._sendCmdWaitResp(adx, payload, True)
+
+    def _sendCmdWaitResp(self, adx, payload, read):
+        if read:
+            cmd = self.readCmd(adx, payload)
+        else:
+            cmd = self.writeCmd(adx, payload)
+
+        try:
+            self.open()
+            self.s.write(cmd)
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
+            if payload is None: raise TimeoutError()
+            return payload
+        finally:
+            self.close()
 
     def __enter__(self):
         self.open()
         self.enterFactory()
 
     def __exit__(self, type, value, traceback):
-        self.exitFactory(self.writeNVMOnExit)
-        self.writeNVMOnExit = False
-        self.close()
+        try:
+            self.exitFactory(self.writeNVMOnExit)
+            self.writeNVMOnExit = False
+        finally:
+            self.close()
 
     def factoryContext(self, writeNVMOnExit = False):
         self.writeNVMOnExit = writeNVMOnExit 
@@ -302,7 +402,7 @@ class JBD:
                     reg.set(valueName, value)
                     regs.add(reg)
                 except ReadOnlyException:
-                    print(f'skipping read-only valueName {valueName}')
+                    pass
 
             for i,reg in enumerate(regs):
                 data = reg.pack()
@@ -389,7 +489,6 @@ class JBD:
                 reg.set('cal', v)
                 cmd = self.writeCmd(adx, reg.pack())
                 self.s.write(cmd)
-                #print(' '.join(f'{i:02X}' for i in cmd))
                 ok, payload = self.readPacket()
                 if not ok: raise BMSError()
                 if payload is None: raise TimeoutError()
@@ -516,8 +615,6 @@ class JBD:
             ok, payload = self.readPacket()
             if not ok: raise BMSError()
             if payload is None: raise TimeoutError()
-
-
 
 def checkRegNames():
     jbd = JBD(None)

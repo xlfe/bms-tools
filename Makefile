@@ -41,7 +41,18 @@ gui: $(COMMIT_HASH_PYTHON) $(VERSION_FILE)
 		export PATHSEP=";"
 		export PYINSTALLER='pyinstaller.exe'
 	fi
-	$${PYINSTALLER} jbd_gui.py --noconfirm ${WINDOWED} ${ONEFILE} --icon "img/batt_icon_128.ico" --add-data "img$${PATHSEP}img" -n bms_tools_jbd_$${OS_NAME}_$(if $(EXACT_TAG),$(EXACT_TAG),$(COMMIT_HASH))
+	pushd gui
+	$${PYINSTALLER} jbd_gui.py \
+		--noconfirm \
+		${WINDOWED} \
+		${ONEFILE} \
+		--icon "img/batt_icon_128.ico" \
+		--distpath=../dist \
+		--workpath=../build \
+		--add-data "img$${PATHSEP}img" \
+		-n bms_tools_jbd_$${OS_NAME}_$(if $(EXACT_TAG),$(EXACT_TAG),$(COMMIT_HASH))
+		rm -Rf *.spec
+	popd
 	rm $(COMMIT_HASH_PYTHON)
 
 clean:

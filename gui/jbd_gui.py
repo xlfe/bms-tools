@@ -24,6 +24,8 @@ import serial
 import serial.tools.list_ports
 import math
 import enum
+import importlib
+import functools
 import random
 import threading
 import traceback
@@ -62,6 +64,7 @@ defaultBorder = wx.EXPAND | wx.TOP | wx.BOTTOM | wx.LEFT | wx.RIGHT, 7
 colGap = (10,1)
 boxGap = (3,3)
 
+class PluginException(Exception): pass
 
 class FieldAnnotation:
     def __init__(self, fieldName = None, fieldLabel = None, range = None, tooltip = None):
@@ -269,6 +272,8 @@ class WriteRedirect:
         wx.PostEvent(self.parent, self.TextEvent(text = text, type = self.type))
 
     def flush(self): pass
+
+
 
 class AboutDialog(wx.Dialog):
     def __init__(self, *args, **kwargs):
@@ -1397,6 +1402,9 @@ class Main(wx.Frame):
 
         self.logger = None
 
+        # plugins
+        self.loadPlugins()
+
         # debug window
         self.debugWindow = DebugWindow(self, title=f'{appName} debug window')
         self.Bind(DebugWindow.EVT_TEXTFRAME_CLOSE, self.onDebugWindowClose)
@@ -1431,15 +1439,34 @@ class Main(wx.Frame):
         font = wx.Font(8, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL)
         self.SetFont(font)
 
-        # menu
 
+        # menu
         self.menuBar = wx.MenuBar()
         self.fileMenu = wx.Menu()
+        self.pluginMenu = wx.Menu()
         self.debugWindowItem = self.fileMenu.Append(wx.ID_ANY, 'Debug Window', 'Show debug window', kind = wx.ITEM_CHECK)
         self.aboutItem = self.fileMenu.Append(wx.ID_ABOUT, 'About', f'About {appName}')
         self.websiteItem = self.fileMenu.Append(wx.ID_ANY, f'{appName} website', f'{appName} website')
+
+        for n,m in self.plugins.items():
+            try:
+                cls = getattr(m, 'plugin_class', None)
+                if cls is None:
+                    raise PluginException(f'plugin "{n}" is missing "plugin_class" attribute')
+                menu_name = getattr(cls, 'menu_name', None)
+                if menu_name is None:
+                    raise PluginException(f'plugin "{n}" class "{cls.__name__}" is missing "menu_name" attribute')
+                menuItem = self.pluginMenu.Append(wx.ID_ANY, menu_name, menu_name)
+                opener = functools.partial(self.pluginOpenHandler, cls)
+                self.Bind(wx.EVT_MENU, opener, menuItem)
+            except PluginException:
+                print(f'plugin "{n}" failed to initialize:', file = sys.stderr)
+                traceback.print_exc()
+
         self.quitItem = self.fileMenu.Append(wx.ID_ANY, 'Quit')
         self.menuBar.Append(self.fileMenu, '&File')
+        if self.pluginMenu.GetMenuItemCount():
+            self.menuBar.Append(self.pluginMenu, '&Plugins')
         self.SetMenuBar(self.menuBar)
         self.Bind(wx.EVT_MENU, self.onDebugWindowToggle, self.debugWindowItem)
         self.Bind(wx.EVT_MENU, self.onWebsite, self.websiteItem)
@@ -1550,7 +1577,52 @@ class Main(wx.Frame):
                 if p.Name == cli_args.tab:
                     nb.SetSelection(i)
                     break
+        if cli_args and cli_args.plugin:
+            for pluginName, plugin in self.plugins.items():
+                print(plugin.plugin_short_name.lower(), 'vs', cli_args.plugin.lower())
+                if plugin.plugin_short_name.lower() == cli_args.plugin.lower():
+                    self.openPlugin(plugin.plugin_class)
 
+
+    def openPlugin(self, pluginClass): 
+        for i in self.pluginsOpen:
+            if isinstance(i, pluginClass):
+                i.SetFocus()
+                return
+        obj = pluginClass(self)
+        self.pluginsOpen.add(obj)
+        obj.Bind(wx.EVT_CLOSE, self.pluginCloseHandler)
+        obj.Show();
+
+    def pluginOpenHandler(self, pluginClass, evt):
+        self.openPlugin(pluginClass)
+
+    def pluginCloseHandler(self, evt):
+        obj = evt.GetEventObject()
+        self.pluginsOpen.remove(obj)
+        obj.Destroy()
+
+    def loadPlugins(self):
+        self.plugins = {}
+        self.pluginsOpen = set()
+        pluginDir = os.path.join(base_path, 'plugins')
+        oldPath = sys.path
+        try:
+            sys.path.insert(0, pluginDir)
+            for _, dirs, files in os.walk(pluginDir):
+                for fn in files + dirs:
+                    if fn.endswith('.py'):
+                        fn = fn[:-3]
+                    try:
+                        l = importlib.import_module(fn)
+                        self.plugins[fn] = l
+                        print(f'plugin "{fn}" successfully loaded')
+                    except:
+                        print(f'plugin "{fn}" loading failed:', file = sys.stderr)
+                        traceback.print_exc()
+                break
+        finally:
+            sys.path = oldPath
 
     def onQuit(self, evt):
         self.Close()
@@ -1572,6 +1644,7 @@ class Main(wx.Frame):
         a = AboutDialog(self)
         a.SetIcon(self.icon)
         a.ShowModal()
+
 
     def onWebsite(self, evt):
         wx.BeginBusyCursor()
@@ -1623,6 +1696,7 @@ class Main(wx.Frame):
     def onScanData(self, evt):
 
         if hasattr(evt, 'err'):
+            print(evt.err)
             print(''.join(traceback.format_tb(evt.err.__traceback__)))
             self.setStatus('Scan Error')
             return
@@ -1638,6 +1712,16 @@ class Main(wx.Frame):
         temps = [v for k,v in evt.basicInfo.items() if self.ntc_RE.match(k) and v is not None]
         bals  = [v for k,v in evt.basicInfo.items() if k.startswith('bal') and v is not None]
         volts = [v for v in evt.cellInfo.values() if v is not None]
+
+        # send data to any open plugins
+
+        for p in self.pluginsOpen:
+            try:
+                p.basicInfo = evt.basicInfo
+                p.cellInfo = evt.cellInfo
+                p.deviceInfo = evt.deviceInfo
+            except:
+                traceback.print_exc()
         
         grid = self.FindWindowByName('info_cell_grid')
         gridRowsNeeded = max(len(volts), len(temps))
@@ -2127,7 +2211,6 @@ class BkgWorker:
 
                         basicInfo, cellInfo, deviceInfo = self.j.readInfo()
                         wx.PostEvent(self.parent, self.ScanData(basicInfo = basicInfo, cellInfo = cellInfo, deviceInfo = deviceInfo))
-                        print('scan complete')
                     except Exception as e:
                         wx.PostEvent(self.parent, self.ScanData(err = e))
                     finally:
@@ -2200,7 +2283,6 @@ class JBDApp(wx.App):
         main = Main(None, title = appNameWithVersion, style = wx.DEFAULT_FRAME_STYLE | wx.WS_EX_VALIDATE_RECURSIVELY, icon = icon, cli_args = self.cli_args)
         main.Show()
 
-
         if not self.cli_args or not self.cli_args.no_warning:
             # startup warning
             d = wx.MessageDialog(None, warningMsg)
@@ -2215,6 +2297,7 @@ if __name__ == "__main__":
     p.add_argument('-o', '--open-debug', action='store_true')
     p.add_argument('-c', '--clear-config', action='store_true')
     p.add_argument('-w', '--no-warning', action='store_true')
+    p.add_argument('-P', '--plugin', help='open plugin <plugin> on launch')
     p.add_argument('-t', '--tab')
     p.add_argument('-p', '--port')
     cli_args = p.parse_args()
