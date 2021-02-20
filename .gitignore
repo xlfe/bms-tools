@@ -3,7 +3,6 @@ dist
 *.spec
 *.egg-info
 **/__pycache__
-bmstools/version.py
 *.csv
 *.xls
 *.xlsx

@@ -1,3 +1,4 @@
 releases/** filter=lfs diff=lfs merge=lfs -text
 img/**/*.png filter=lfs diff=lfs merge=lfs -text
 doc_img/**/*.png filter=lfs diff=lfs merge=lfs -text
+bmstools/_version.py export-subst
