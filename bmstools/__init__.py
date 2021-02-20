@@ -16,8 +16,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-try:
-    from .version import version
-except ModuleNotFoundError as e:
-    raise RuntimeError('bmstools/version.py not found; try running `setup.py --bmstools-gen-version` or `make version`') from e
 __all__=['version']
+from ._version import get_versions
+__version__ = get_versions()['version']
+del get_versions
+version = __version__

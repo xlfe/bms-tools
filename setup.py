@@ -21,52 +21,28 @@ import subprocess
 import argparse
 import sys
 import os
+import versioneer
 
 scriptFile = os.path.abspath(__file__)
 scriptDir = os.path.dirname(scriptFile)
 
-def genVersionFile():
-    cmd = 'git describe --dirty --abbrev=10 --tags'.split()
-    version = subprocess.check_output(cmd, cwd = scriptDir).strip()
-    fn = os.path.join(scriptDir, 'bmstools', 'version.py')
-    with open(fn, 'w') as v:
-        v.write(f'''#!/usr/bin/env python
+setup(
+    name='bmstools',
+    url='https://gitlab.com/MrSurly/bms-tools.git',
+    maintainer='Eric Poulsen',
+    maintainer_email='"Eric Poulsen" <eric@zyxod.com>',
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
+    install_requires=['pyserial~=3.4', 'xlsxwriter==1.3.7'],
 
-version = {repr(str(version, 'utf-8'))}
-''')
-    return version
+    extras_require = {
+        'gui': ['wxPython~=4.1.1', 'pyinstaller']
+    },
+    license='Creative Commons Attribution-Noncommercial-Share Alike license',
+    packages=['bmstools'],
+    entry_points = {
+        'console_scripts': [
+        ]
+    }
+)
 
-
-def doSetup():
-    setup(
-        name='bmstools',
-        url='https://gitlab.com/MrSurly/bms-tools.git',
-        maintainer='Eric Poulsen',
-        maintainer_email='"Eric Poulsen" <eric@zyxod.com>',
-        version='0.0.1-dev',
-        install_requires=['pyserial~=3.4', 'xlsxwriter==1.3.7'],
-
-        extras_require = {
-            'gui': ['wxPython~=4.1.1', 'pyinstaller']
-        },
-        license='Creative Commons Attribution-Noncommercial-Share Alike license',
-        packages=['bmstools'],
-        entry_points = {
-            'console_scripts': [
-            ]
-        }
-    )
-
-
-if __name__ == '__main__':
-    p = argparse.ArgumentParser()
-    p.add_argument('--bmstools-gen-version', action = 'store_true')
-
-    n = sys.argv[0]
-    args, rem = p.parse_known_args()
-    sys.argv = [n] + rem
-    ver = genVersionFile()
-    if args.bmstools_gen_version:
-        print(f'version is {ver}')
-    else:
-        doSetup()
