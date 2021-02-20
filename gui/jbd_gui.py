@@ -40,7 +40,7 @@ import wx.lib.newevent
 import wx.lib.masked.numctrl
 import wx.html2
 import bmstools.jbd as jbd
-import bmstools.version 
+import bmstools
 from bmstools.jbd.logging import Logger
 
 appName = 'JBD BMS Tools'
