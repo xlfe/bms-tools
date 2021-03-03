@@ -1808,6 +1808,7 @@ class Main(wx.Frame):
         data = {}
         for c in ChildIter.iterNamed(self):
             if not c.Name.startswith('eeprom_'): continue
+            if c.Name.startswith('eeprom_label'): continue
             n = c.Name[7:]
             data[n] = self.get(c.Name)
         return data
