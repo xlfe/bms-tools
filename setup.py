@@ -42,6 +42,7 @@ setup(
     packages=['bmstools'],
     entry_points = {
         'console_scripts': [
+            'bmstools_jbd_gui=gui.jbd_gui:main' 
         ]
     }
 )
