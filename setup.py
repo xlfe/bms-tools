@@ -16,7 +16,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from distutils.core import setup
+from setuptools import setup, find_packages
+
 import subprocess
 import argparse
 import sys
@@ -39,7 +40,7 @@ setup(
         'gui': ['wxPython~=4.1.1', 'pyinstaller']
     },
     license='Creative Commons Attribution-Noncommercial-Share Alike license',
-    packages=['bmstools'],
+    packages=find_packages(),
     entry_points = {
         'console_scripts': [
             'bmstools_jbd_gui=gui.jbd_gui:main' 
