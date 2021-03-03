@@ -2297,7 +2297,7 @@ class JBDApp(wx.App):
 
         return True
 
-if __name__ == "__main__":
+def main():
     import argparse
     p = argparse.ArgumentParser()
     p.add_argument('-n', '--no-redirect', action='store_true')
@@ -2311,3 +2311,6 @@ if __name__ == "__main__":
 
     app = JBDApp(cli_args = cli_args)
     app.MainLoop()
+
+if __name__ == "__main__":
+    main()
