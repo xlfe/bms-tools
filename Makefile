@@ -12,20 +12,13 @@ COMMIT_HASH_PYTHON=commit_hash.py
 DIRTY=$(findstring, dirty, $(COMMIT_HASH))
 EXACT_TAG:=$(if $(DIRTY),,$(shell git tag --points-at HEAD))
 
-VERSION_FILE=bmstools/version.py
 
 all: gui
-
-version: $(VERSION_FILE)
 
 $(COMMIT_HASH_PYTHON):
 	echo \#!/usr/bin/env python > $@
 	echo commit_hash = \'$(COMMIT_HASH)\' >> $@
 	echo tag = \'$(EXACT_TAG)\' >> $@
-
-$(VERSION_FILE): FORCE
-	./setup.py --bmstools-gen-version
-	
 
 FORCE:
 
