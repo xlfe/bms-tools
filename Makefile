@@ -22,7 +22,10 @@ $(COMMIT_HASH_PYTHON):
 
 FORCE:
 
-gui: $(COMMIT_HASH_PYTHON) $(VERSION_FILE)
+build:
+	python3 setup.py build
+
+gui: $(COMMIT_HASH_PYTHON) build
 	if [[ "$$OSTYPE" == "linux-gnu" ]]; then
 		echo Linux build ...
 		export OS_NAME='linux'
@@ -40,6 +43,7 @@ gui: $(COMMIT_HASH_PYTHON) $(VERSION_FILE)
 		${WINDOWED} \
 		${ONEFILE} \
 		--icon "img/batt_icon_128.ico" \
+		--paths ../build/lib \
 		--distpath=../dist \
 		--workpath=../build \
 		--add-data "img$${PATHSEP}img" \
