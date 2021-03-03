@@ -39,8 +39,8 @@ import wx.lib.scrolledpanel as scrolled
 import wx.lib.newevent
 import wx.lib.masked.numctrl
 import wx.html2
-import bmstools.jbd as jbd
 import bmstools
+import bmstools.jbd as jbd
 from bmstools.jbd.logging import Logger
 
 appName = 'JBD BMS Tools'
