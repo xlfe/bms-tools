@@ -2,17 +2,21 @@
 
 ## Changelog
 
+### v1.1.3 2021-3-3
+
+* GUI Fix: EEPROM writes not working because of tool tip update
+
 ### v1.1.2 2021-2-16
 
-* Feature: Tool tips
-* Feature: Load/Save/Read/Write made more clear
+* GUI Feature: Tool tips
+* GUI Feature: Load/Save/Read/Write made more clear
 * Fix: Minor updates and fixes in JBD_REGISTER_MAP.MD
 * Fix: EEPROM save not sticking between power cycles
 * Fix: 16S BMS error 
 
 ### v1.1.1 2020-12-31
 
-* Fix for temp field decimal indicator problems based on locale
+* GUI Fix for temp field decimal indicator problems based on locale
 
 ### v1.1.0 2020-12-28
 
