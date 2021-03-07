@@ -50,7 +50,7 @@ The checksum is simply sum of the payload byte values subtracted from 0x10000 (6
 
 <table border="1">
     <tr>
-     <td>Command byte: Read: 0x5A, Write: 0xA5</th>
+     <td>Command byte: Read: 0xA5, Write: 0x5A</th>
      <td>Register Address Byte</th>
      <td>Data length byte</th>
      <td>Data bytes, n = data length byte</th>
