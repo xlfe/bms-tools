@@ -2,6 +2,10 @@
 
 ## Changelog
 
+### v1.1.3 2021-3-24
+
+* GUI Fix: Clearing error counts no longer turns the labels to `0`
+
 ### v1.1.3 2021-3-3
 
 * GUI Fix: EEPROM writes not working because of tool tip update
