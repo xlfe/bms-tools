@@ -2131,8 +2131,10 @@ class Main(wx.Frame):
             try:
                 self.j.clearErrors()
                 for c in ChildIter.iterNamed(self):
+                    if 'label_' in c.Name: continue
                     if not c.Name.endswith('_err_cnt'): continue
                     if not c.Name.startswith('eeprom_'): continue
+                    print(f'changing {c.Name}')
                     c.SetLabel('0')
             except jbd.BMSError:
                 self.setStatus('BMS comm error')
