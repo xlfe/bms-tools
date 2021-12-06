@@ -443,20 +443,9 @@ class JBD:
 
     def writeReg(self, reg, writeNVM = False):
         with self.factoryContext(writeNVM):
-            if isinstance(reg, int):
-                if reg not in self.eeprom_reg_by_adx:
-                    raise ValueError('unknown register address')
-                reg = self.eeprom_reg_by_adx[reg]
-            elif isinstance(reg, BaseReg):
-                pass
-            elif isinstance(reg, str):
-                if reg not in self.eeprom_reg_by_regname:
-                    raise ValueError('uniknown register name')
-                reg = self.eeprom_reg_by_regname[reg]
-            else:
-                raise ValueError('reg type must be int or instantce of BaseReg')
+            if not isinstance(reg, BaseReg):
+                raise ValueError('reg type must be instantce of BaseReg')
 
-            print(f'writing reg adx {reg.adx:#x} value {reg.values}')
             cmd = self.writeCmd(reg.adx, reg.pack())
             self.s.write(cmd)
             ok, payload = self.readPacket()
