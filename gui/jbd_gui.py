@@ -73,13 +73,16 @@ class FieldAnnotation:
         self.range = range
         self.tooltip = tooltip
 
-cellRange   = (0, 65536, 100)
-packRange   = (0, 655350, 100)
-tempRange   = (-273.15, 6316.4, 1)
-mahRange     = (0, 655350, 1000)
-chgRange    = (0, 327670, 100)
-dsgRange    = (-327680, 0, 100)
-delayRange  = (0, 255, 1)
+cellRange       = (0, 65536, 100)
+covpHighRange   = (3110, 4635, 100)
+cuvpHighRange   = (1575, 3101, 100)
+
+packRange       = (0, 655350, 100)
+tempRange       = (-273.15, 6316.4, 1)
+mahRange        = (0, 655350, 1000)
+chgRange        = (0, 327670, 100)
+dsgRange        = (-327680, 0, 100)
+delayRange      = (0, 255, 1)
 
 fa = FieldAnnotation
 field_annotations = [
@@ -115,9 +118,11 @@ field_annotations = [
     fa('dsgoc_rel', range=delayRange, tooltip='discharge over current release'),
     fa('dsgoc_delay', range=delayRange, tooltip='discharge over current delay'),
 
-    fa('covp_high', range=cellRange, tooltip='cell over volt protection (level 2)'),
+    fa('covp_high', range=covpHighRange, tooltip='cell over volt protection (level 2)'),
+    #fa('covp_high', range=cellRange, tooltip='cell over volt protection (level 2)'),
     fa('covp_high_delay', range=cellRange, tooltip='cell over volt protection (level 2) delay'),
-    fa('cuvp_high', range=cellRange, tooltip='cell under volt protection (level 2)'),
+    fa('cuvp_high', range=cuvpHighRange, tooltip='cell under volt protection (level 2)'),
+    #fa('cuvp_high', range=cellRange, tooltip='cell under volt protection (level 2)'),
     fa('cuvp_high_delay', range=cellRange, tooltip='cell under volt protection (level 2) delay'),
 
 
