@@ -140,6 +140,10 @@ class FwDebugDialog(PluginBase, wx.Dialog):
         self.controlButton.Bind(wx.EVT_BUTTON, self.onControlButton)
         vbox0.Add(self.controlButton, 1, *defaultBorder)
 
+        self.dumpRegsButton = wx.Button(self, label='Dump Regs')
+        self.dumpRegsButton.Bind(wx.EVT_BUTTON, self.onDumpRegsButton)
+        vbox0.Add(self.dumpRegsButton, 1, *defaultBorder)
+
         topsizer.Add(sbs, 1, *defaultBorder)
 
         self.Bind(wx.EVT_WINDOW_DESTROY, self.onDestroy)
@@ -261,6 +265,17 @@ class FwDebugDialog(PluginBase, wx.Dialog):
 
         self.inControl = not self.inControl
         self.controlButton.SetLabel('Release Control' if self.inControl else 'Take Control')
+
+    def onDumpRegsButton(self, evt):
+        try:
+            self.GetParent().accessLock.acquire()
+            s = debug_struct.debug_cmd_packet_t()
+            s.cmd = debug_struct.DEBUG_CMD_DUMP_REGS;
+            payload = self.j.writeCmdWaitResp(0xFF, bytes(s))
+        except:
+            traceback.print_exc()
+        finally:
+            self.GetParent().accessLock.release()
 
 plugin_class = FwDebugDialog
 plugin_short_name = 'fw_debug'
