@@ -26,7 +26,7 @@ from enum import Enum
 from functools import partial
 from . import persist
 
-from .registers import (Unit, DateReg, IntReg, 
+from .registers import (BaseReg, Unit, DateReg, IntReg, 
                         TempReg, TempRegRO, DelayReg, 
                         ScDsgoc2Reg, CxvpHighDelayScRelReg,
                         BitfieldReg, StringReg, ErrorCountReg,
@@ -145,9 +145,14 @@ class JBD:
             ErrorCountReg('error_cnts', 0xaa),
         ]
         self.eeprom_reg_by_valuename = {}
+        self.eeprom_reg_by_adx = {}
+        self.eeprom_reg_by_regname = {}
         for reg in self.eeprom_regs:
             map = {k:reg for k in reg.valueNames}
             self.eeprom_reg_by_valuename.update(map)
+            self.eeprom_reg_by_adx[reg.adx] = reg
+            self.eeprom_reg_by_regname[reg.regName] = reg
+
 
         self.basicInfoReg = BasicInfoReg('basic_info', 0x03)
         self.cellInfoReg = CellInfoReg('cell_info', 0x04)
@@ -412,6 +417,51 @@ class JBD:
                 if not ok: raise BMSError()
                 if payload is None: raise TimeoutError()
                 if progressFunc: progressFunc(int(i / (numRegs-1) * 100))
+
+    def readReg(self, reg):
+        with self.factoryContext():
+            if isinstance(reg, int):
+                if reg not in self.eeprom_reg_by_adx:
+                    raise ValueError('unknown register address')
+                reg = self.eeprom_reg_by_adx[reg]
+            elif isinstance(reg, BaseReg):
+                pass
+            elif isinstance(reg, str):
+                if reg not in self.eeprom_reg_by_regname:
+                    raise ValueError('uniknown register name')
+                reg = self.eeprom_reg_by_regname[reg]
+            else:
+                raise ValueError('reg type must be int or instantce of BaseReg')
+
+            cmd = self.readCmd(reg.adx)
+            self.s.write(cmd)
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
+            if payload is None: raise TimeoutError()
+            reg.unpack(payload)
+            return reg
+
+    def writeReg(self, reg, writeNVM = False):
+        with self.factoryContext(writeNVM):
+            if isinstance(reg, int):
+                if reg not in self.eeprom_reg_by_adx:
+                    raise ValueError('unknown register address')
+                reg = self.eeprom_reg_by_adx[reg]
+            elif isinstance(reg, BaseReg):
+                pass
+            elif isinstance(reg, str):
+                if reg not in self.eeprom_reg_by_regname:
+                    raise ValueError('uniknown register name')
+                reg = self.eeprom_reg_by_regname[reg]
+            else:
+                raise ValueError('reg type must be int or instantce of BaseReg')
+
+            print(f'writing reg adx {reg.adx:#x} value {reg.values}')
+            cmd = self.writeCmd(reg.adx, reg.pack())
+            self.s.write(cmd)
+            ok, payload = self.readPacket()
+            if not ok: raise BMSError()
+            if payload is None: raise TimeoutError()
 
     def loadEepromFile(self, filename):
         p = persist.JBDPersist()
