@@ -427,9 +427,12 @@ class JBD:
             elif isinstance(reg, BaseReg):
                 pass
             elif isinstance(reg, str):
-                if reg not in self.eeprom_reg_by_regname:
-                    raise ValueError('uniknown register name')
-                reg = self.eeprom_reg_by_regname[reg]
+                if (reg not in self.eeprom_reg_by_regname) and (reg not in self.eeprom_reg_by_valuename):
+                    raise ValueError('unknown register name')
+                x = self.eeprom_reg_by_regname.get(reg, None)
+                if x is None:
+                    x = self.eeprom_reg_by_valuename[reg]
+                reg = x
             else:
                 raise ValueError('reg type must be int or instantce of BaseReg')
 
